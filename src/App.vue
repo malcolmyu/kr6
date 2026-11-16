@@ -162,12 +162,12 @@ async function loadScene(restarted=false,report:(images:number,audio?:number)=>v
 }
 onMounted(() => {
   window.addEventListener('pagehide',saveSessionProgress);document.addEventListener('visibilitychange',saveWhenHidden)
-  void fetch('/data/options.json').then(r=>{if(!r.ok)throw new Error('暂停窗口载入失败');return r.json()}).then(async(data:PauseArt)=>{await preloadNativeImages(Object.keys(data.images).map(name=>'/assets/'+name+'.png'));optionsArt.value=data}).catch(e=>{error.value=String(e)})
+  void fetch('data/options.json').then(r=>{if(!r.ok)throw new Error('暂停窗口载入失败');return r.json()}).then(async(data:PauseArt)=>{await preloadNativeImages(Object.keys(data.images).map(name=>'assets/'+name+'.png'));optionsArt.value=data}).catch(e=>{error.value=String(e)})
   audio.onError=message=>{error.value=message}
   void audio.init().catch(e=>{error.value=String(e)})
-  void fetch('/data/hud.json').then(r=>{if(!r.ok)throw new Error('无法读取战斗界面');return r.json()}).then(data=>{hudData.value=data}).catch(e=>{error.value=String(e)})
-  void fetch('/data/tower-menu.json').then(r=>{if(!r.ok)throw new Error('无法读取防御塔菜单');return r.json()}).then(async data=>{await preloadNativeImages(Object.keys(data.sizes).map(name=>'/assets/'+name+'.png'));towerMenuData.value=data}).catch(e=>{error.value=String(e)})
-  void fetch('/data/tutorial.json').then(r=>{if(!r.ok)throw new Error('无法读取教学提示');return r.json()}).then(data=>{balloons.value=data.balloons;focusSettings.value=data.focus}).catch(e=>{error.value=String(e)})
+  void fetch('data/hud.json').then(r=>{if(!r.ok)throw new Error('无法读取战斗界面');return r.json()}).then(data=>{hudData.value=data}).catch(e=>{error.value=String(e)})
+  void fetch('data/tower-menu.json').then(r=>{if(!r.ok)throw new Error('无法读取防御塔菜单');return r.json()}).then(async data=>{await preloadNativeImages(Object.keys(data.sizes).map(name=>'assets/'+name+'.png'));towerMenuData.value=data}).catch(e=>{error.value=String(e)})
+  void fetch('data/tutorial.json').then(r=>{if(!r.ok)throw new Error('无法读取教学提示');return r.json()}).then(data=>{balloons.value=data.balloons;focusSettings.value=data.focus}).catch(e=>{error.value=String(e)})
 })
 function createWorld(){
   world = new WorldRenderer(viewport.value!)

@@ -26,7 +26,7 @@ function action(name:string){
 function resize(){viewport.value={w:innerWidth,h:innerHeight}}
 function tick(now:number){age.value+=previous?Math.min(.1,(now-previous)/1000):0;previous=now;handle=requestAnimationFrame(tick)}
 function key(e:KeyboardEvent){if(e.key==='Escape')emit('close')}
-onMounted(async()=>{addEventListener('resize',resize);addEventListener('keydown',key);try{const response=await fetch('/data/hero-room.json');if(!response.ok)throw Error('英雄房间载入失败');data.value=await response.json();if(!disposed){for(let index=1;index<=18;index++){const image=new Image();image.src='/assets/room_tower_animation_upgrade_select_fx_'+String(index).padStart(4,'0')+'.png'}handle=requestAnimationFrame(tick)}}catch(e){error.value=String(e)}})
+onMounted(async()=>{addEventListener('resize',resize);addEventListener('keydown',key);try{const response=await fetch('data/hero-room.json');if(!response.ok)throw Error('英雄房间载入失败');data.value=await response.json();if(!disposed){for(let index=1;index<=18;index++){const image=new Image();image.src='assets/room_tower_animation_upgrade_select_fx_'+String(index).padStart(4,'0')+'.png'}handle=requestAnimationFrame(tick)}}catch(e){error.value=String(e)}})
 onBeforeUnmount(()=>{disposed=true;purchaseTimers.forEach(clearTimeout);cancelAnimationFrame(handle);removeEventListener('resize',resize);removeEventListener('keydown',key)})
 </script>
 <template>

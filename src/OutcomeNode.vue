@@ -17,7 +17,7 @@ const bandStyle=computed(()=>{const args=props.node.shader_args?.find(a=>a.c1&&a
 </script>
 <template>
  <component :is="button?'button':'div'" v-if="!hidden" class="outcome-node" :class="{label,button}" :style="style" :data-outcome-node="node.id" :aria-label="button?(node.id==='button_vd_restart'?'重新挑战':'继续'):undefined" @pointerenter="hovered=true" @pointerleave="hovered=false" @click="button&&emit('action',node.id!)">
-  <img v-if="image" :src="'/assets/'+image+'.png'" alt=""/>
+  <img v-if="image" :src="'assets/'+image+'.png'" alt=""/>
   <span v-if="label" :style="bandStyle">{{text}}</span>
   <OutcomeNode v-for="(child,index) in node.children" :key="index" :node="child" :poses="poses" :data="data" :victory="victory" :iron="iron" @action="emit('action',$event)"/>
  </component>

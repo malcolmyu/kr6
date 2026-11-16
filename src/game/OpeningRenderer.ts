@@ -37,10 +37,10 @@ export class OpeningRenderer {
     this.camera.left=-half*aspect;this.camera.right=half*aspect;this.camera.top=half;this.camera.bottom=-half;this.camera.updateProjectionMatrix()
   }
   async load(){
-    const response=await fetch('/data/opening.json');if(!response.ok)throw new Error('启动资源载入失败')
+    const response=await fetch('data/opening.json');if(!response.ok)throw new Error('启动资源载入失败')
     const data:OpeningData=await response.json(),loader=new THREE.TextureLoader()
     const maps:Record<string,THREE.Texture>={}
-    await Promise.all(data.textures.map(async name=>{maps[name]=await loader.loadAsync(`/assets/${name}`)}))
+    await Promise.all(data.textures.map(async name=>{maps[name]=await loader.loadAsync(`assets/${name}`)}))
     if(this.disposed){Object.values(maps).forEach(t=>t.dispose());return}
     this.textures=Object.values(maps);this.data=data;this.atlas=new SpriteAtlas(data.atlas,maps)
     this.renderer.render(this.scene,this.camera)

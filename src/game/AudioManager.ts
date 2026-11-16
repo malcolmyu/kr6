@@ -20,7 +20,7 @@ export class AudioManager {
   private sequence=new Map<string,number>()
   private lastPlayed=new Map<string,number>()
   onError:(message:string)=>void=()=>{}
-  init(){return this.loading??=(async()=>{const response=await fetch('/data/audio.json');if(!response.ok)throw new Error('音频配置载入失败');this.data=await response.json()})()}
+  init(){return this.loading??=(async()=>{const response=await fetch('data/audio.json');if(!response.ok)throw new Error('音频配置载入失败');this.data=await response.json()})()}
   async unlock(){
     if(!this.context){this.context=new AudioContext();this.master=this.context.createGain();this.master.gain.value=this.enabled?1:0;this.master.connect(this.context.destination);this.musicBus=this.context.createGain();this.fxBus=this.context.createGain();this.musicBus.connect(this.master);this.fxBus.connect(this.master);this.setVolumes(this.volumes)}
     await this.context.resume()
@@ -35,7 +35,7 @@ export class AudioManager {
   private choose(value:number|number[]|undefined,fallback:number):number {return Array.isArray(value)?value[0]+Math.random()*(value[1]-value[0]):value??fallback}
   private buffer(file:string):Promise<AudioBuffer>{
     let buffer=this.buffers.get(file)
-    if(!buffer){buffer=fetch(`/audio/${file}`).then(r=>{if(!r.ok)throw new Error(`Missing audio ${file}`);return r.arrayBuffer()}).then(data=>this.context!.decodeAudioData(data));this.buffers.set(file,buffer)}
+    if(!buffer){buffer=fetch(`audio/${file}`).then(r=>{if(!r.ok)throw new Error(`Missing audio ${file}`);return r.arrayBuffer()}).then(data=>this.context!.decodeAudioData(data));this.buffers.set(file,buffer)}
     return buffer
   }
   async preload(name:string){

@@ -27,9 +27,9 @@ onMounted(async()=>{
  observer=new ResizeObserver(entries=>{const r=entries[0].contentRect;size.value={width:r.width,height:r.height}});observer.observe(root.value!)
  window.addEventListener('keydown',key)
  try {
-  const response=await fetch('/data/comic'+String(props.index).padStart(2,'0')+'.json');if(!response.ok)throw new Error('漫画载入失败');data.value=await response.json()
+  const response=await fetch('data/comic'+String(props.index).padStart(2,'0')+'.json');if(!response.ok)throw new Error('漫画载入失败');data.value=await response.json()
   const images=[...new Set(data.value!.pages.flatMap(p=>p.sprites.map(s=>s.image)))]
-  await Promise.all(images.map(name=>new Promise<void>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve();img.onerror=()=>reject(new Error('漫画图片缺失：'+name));img.src='/assets/'+name+'.png'})))
+  await Promise.all(images.map(name=>new Promise<void>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve();img.onerror=()=>reject(new Error('漫画图片缺失：'+name));img.src='assets/'+name+'.png'})))
   await document.fonts.load('22px ComicBody');if(disposed)return;player=new ComicPlayer(data.value!);player.onSound=name=>emit('sound',name);player.onDone=()=>emit('done');ready.value=true;handle=requestAnimationFrame(animate)
  }catch(e){error.value=String(e)}
 })
@@ -39,7 +39,7 @@ onBeforeUnmount(()=>{disposed=true;cancelAnimationFrame(handle);observer?.discon
 <section ref="root" class="comic-screen" aria-label="开场漫画" :data-comic-page="(player?.pageIndex??0)+1" :data-frame="frame" :data-playing="playing">
  <div v-if="page&&ready" class="comic-sheet" :style="sheet">
   <div v-for="(sprite,index) in page.sprites" :key="sprite.id" class="comic-panel" :data-panel="sprite.id" :style="spriteStyle(sprite,poses[index])">
-   <img :src="'/assets/'+sprite.image+'.png'" alt=""/>
+   <img :src="'assets/'+sprite.image+'.png'" alt=""/>
    <span v-for="label in sprite.labels" :key="label.text" class="comic-label" :style="labelStyle(label)"><span>{{label.text}}</span></span>
   </div>
  </div>

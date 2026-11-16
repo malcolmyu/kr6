@@ -101,7 +101,8 @@
     "test:wizard-copies-chain": "node scripts/verify_wizard_copies_chain_all.mjs",
     "test:wizard-copies-core": "node scripts/verify_wizard_copies_tower.mjs && node scripts/verify_wizard_copies_motion.mjs && node scripts/verify_wizard_copies_dispatch.mjs && node scripts/verify_wizard_copies_session.mjs && node scripts/verify_wizard_copies_particles.mjs && node scripts/verify_wizard_copies_bounce.mjs && node scripts/verify_wizard_copies_aura.mjs",
     "test:firebook-battle": "node scripts/browser_native_full_battle.mjs --firebook",
-    "test:firebook-mixed": "node scripts/verify_native_hero_profile.mjs --firebook && node scripts/verify_native_battle_sounds.mjs --firebook"
+    "test:firebook-mixed": "node scripts/verify_native_hero_profile.mjs --firebook && node scripts/verify_native_battle_sounds.mjs --firebook",
+    "build:pages": "vue-tsc --noEmit && vite build --base=/kr6/"
   },
   "dependencies": {
     "three": "^0.181.0",

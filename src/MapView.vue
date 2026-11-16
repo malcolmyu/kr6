@@ -36,14 +36,14 @@ function move(e:PointerEvent){if(!drag)return;const dx=(e.clientX-drag.x)/scale.
 function wheel(e:WheelEvent){if(selected.value||e.deltaY===0)return;const rect=root.value!.getBoundingClientRect();mapViewport.value.scroll(e.deltaY>0?'wd':'wu',{x:(e.clientX-rect.left-layout.value.origin.x)/scale.value,y:(e.clientY-rect.top-layout.value.origin.y)/scale.value})}
 function animate(now:number){time.value+=previous?Math.min(.1,(now-previous)/1000):0;previous=now;handle=requestAnimationFrame(animate)}
 onMounted(async()=>{observer=new ResizeObserver(entries=>{const b=entries[0].contentRect;size.value={w:b.width,h:b.height}});observer.observe(root.value!);try{
- const [response,hero,power,level,global]=await Promise.all([fetch('/data/map.json'),fetch('/data/hero-room.json'),fetch('/data/power-room.json'),fetch('/data/level-select.json'),fetch('/data/global-room.json')]);if(!response.ok||!hero.ok||!power.ok||!level.ok||!global.ok)throw new Error('地图载入失败')
+ const [response,hero,power,level,global]=await Promise.all([fetch('data/map.json'),fetch('data/hero-room.json'),fetch('data/power-room.json'),fetch('data/level-select.json'),fetch('data/global-room.json')]);if(!response.ok||!hero.ok||!power.ok||!level.ok||!global.ok)throw new Error('地图载入失败')
  const [map,room,powers,selection,globals]=await Promise.all([response.json(),hero.json(),power.json(),level.json(),global.json()]);if(disposed)return;data.value=map;heroArt.value=room;powerArt.value=powers;globalArt.value=globals;levelArt.value=selection;resetViewport()
- const urls=['/assets/screen_map_bg-1.png','/assets/screen_map_bg-2.png',...Object.keys(data.value!.images).map(n=>'/assets/'+n+'.png')]
- const visit=(node:RoomNode)=>{for(const key of ['image_name','default_image_name','focus_image_name','disabled_image_name'] as const){const value=(node as RoomNode&{disabled_image_name?:string})[key];if(typeof value==='string')urls.push('/assets/'+value+'.png')}for(const child of node.children??[])visit(child)}
+ const urls=['assets/screen_map_bg-1.png','assets/screen_map_bg-2.png',...Object.keys(data.value!.images).map(n=>'assets/'+n+'.png')]
+ const visit=(node:RoomNode)=>{for(const key of ['image_name','default_image_name','focus_image_name','disabled_image_name'] as const){const value=(node as RoomNode&{disabled_image_name?:string})[key];if(typeof value==='string')urls.push('assets/'+value+'.png')}for(const child of node.children??[])visit(child)}
  if(heroEntry.value)visit(heroEntry.value)
  if(powerEntry.value)visit(powerEntry.value)
  if(globalEntry.value)visit(globalEntry.value)
- for(const name of Object.keys(levelArt.value!.images))urls.push('/assets/'+name+'.png')
+ for(const name of Object.keys(levelArt.value!.images))urls.push('assets/'+name+'.png')
  await preloadNativeImages(urls,value=>{if(!disposed)emit('loading',value)});if(disposed)return;handle=requestAnimationFrame(animate);finishReady()
  }catch(e){if(!disposed){error.value=String(e);finishReady(error.value)}}})
 onBeforeUnmount(()=>{disposed=true;finishReady('地图已取消载入');cancelAnimationFrame(handle);observer?.disconnect()})
@@ -52,8 +52,8 @@ onBeforeUnmount(()=>{disposed=true;finishReady('地图已取消载入');cancelAn
  <section ref="root" class="native-map" aria-label="王国地图" @pointerdown="down" @pointermove="move" @pointerup="drag=undefined" @pointercancel="drag=undefined" @wheel.prevent="wheel">
   <div v-if="data" class="map-paper" :style="paper"><img class="map-bg first" src="/assets/screen_map_bg-1.png" alt=""/><img class="map-bg second" src="/assets/screen_map_bg-2.png" alt=""/>
    <div v-for="flag in data.flags.filter(f=>unlocked(f.level))" :key="flag.level" class="map-flag" :style="{left:flag.pos.x+'px',top:flag.pos.y+'px'}">
-    <img :style="image(flagName(flag.level),-43.95,-106.55)" :src="'/assets/'+flagName(flag.level)+'.png'" alt=""/>
-    <img v-for="star in 3" :key="star" :style="image('kr6_map_flags_animation_stage_flag_star_'+star+'_0001',[-16.45,3.2,21.35][star-1]-[12.15,17.45,17.6][star-1],[-63.45,-63.9,-64.55][star-1]-[15.6,24.75,16.25][star-1])" :src="'/assets/kr6_map_flags_animation_stage_flag_star_'+star+'_'+((progress.levels[flag.level]?.campaign??0)>=star?'0022':'0001')+'.png'" alt=""/>
+    <img :style="image(flagName(flag.level),-43.95,-106.55)" :src="'assets/'+flagName(flag.level)+'.png'" alt=""/>
+    <img v-for="star in 3" :key="star" :style="image('kr6_map_flags_animation_stage_flag_star_'+star+'_0001',[-16.45,3.2,21.35][star-1]-[12.15,17.45,17.6][star-1],[-63.45,-63.9,-64.55][star-1]-[15.6,24.75,16.25][star-1])" :src="'assets/kr6_map_flags_animation_stage_flag_star_'+star+'_'+((progress.levels[flag.level]?.campaign??0)>=star?'0022':'0001')+'.png'" alt=""/>
     <span class="flag-number">{{flag.level}}</span>
     <button :aria-label="flag.level+'. '+names[flag.level-1]" @pointerenter="hover=flag.level" @pointerleave="hover=undefined" @click="pick(flag.level)"/>
    </div>

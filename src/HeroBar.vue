@@ -31,19 +31,19 @@ onMounted(()=>window.addEventListener('keydown',key));onBeforeUnmount(()=>window
   <button v-for="(hero,index) in heroes" :key="hero.id" class="hero-portrait" :data-hero="hero.name" :aria-label="hero.name" :aria-pressed="hero.selected" :disabled="disabled||hero.hp<=0" :style="{left:(heroX+index*66)+'px',top:(layout.sh-layout.safe.bl-78)+'px',width:'124px',height:'142px',transform:'scale(.6)'}" @pointerenter="hover=hero.name" @pointerleave="hover=''" @click="emit('hero',hero.id)">
     <img :style="image('ingame_ui_gui_portraits_hero_bg')" src="/assets/ingame_ui_gui_portraits_hero_bg.png" alt=""/>
     <img v-if="hover===hero.name" :style="image('ingame_ui_gui_portraits_hero_bg_hover')" src="/assets/ingame_ui_gui_portraits_hero_bg_hover.png" alt=""/>
-    <img :style="image('hero_portraits_000'+hero.image,-7,-22)" :src="'/assets/hero_portraits_'+(hero.hp>0?'':'disabled_')+'000'+hero.image+'.png'" alt=""/>
+    <img :style="image('hero_portraits_000'+hero.image,-7,-22)" :src="'assets/hero_portraits_'+(hero.hp>0?'':'disabled_')+'000'+hero.image+'.png'" alt=""/>
     <img :style="{...image('ingame_ui_hero_portrait_bars_0001',47.7,104),transform:`scaleX(${Math.max(0,hero.hp/hero.maxHp)})`}" src="/assets/ingame_ui_hero_portrait_bars_0001.png" alt=""/>
     <img class="hero-xp" :style="{...image('ingame_ui_hero_portrait_bars_0002',47.7,115),transform:`scaleX(${hero.xpFraction??0})`}" src="/assets/ingame_ui_hero_portrait_bars_0002.png" alt=""/>
     <span class="hero-level">{{hero.level}}</span>
-    <img v-if="hero.selected" :style="image('hero_portraits_selected_000'+hero.image,-7,-22)" :src="'/assets/hero_portraits_selected_000'+hero.image+'.png'" alt=""/>
+    <img v-if="hero.selected" :style="image('hero_portraits_selected_000'+hero.image,-7,-22)" :src="'assets/hero_portraits_selected_000'+hero.image+'.png'" alt=""/>
   </button>
   <div class="powers" aria-label="战斗技能">
     <button v-for="(power,index) in powers" :key="power.kind" class="power-portrait" :data-power="power.kind" :aria-label="power.name" :aria-pressed="power.selected" :disabled="disabled||power.locked||power.remaining>0" :style="{left:(powerX+index*58.8)+'px',top:(layout.sh-layout.safe.bl-64.68)+'px',width:'77px',height:'77px',transform:'scale(.588)'}" @pointerenter="hover=power.kind" @pointerleave="hover=''" @click="emit('power',power.kind)">
-      <img :style="image('in_game_icon_power_'+power.kind)" :src="'/assets/in_game_icon_power_'+power.kind+'.png'" alt=""/>
+      <img :style="image('in_game_icon_power_'+power.kind)" :src="'assets/in_game_icon_power_'+power.kind+'.png'" alt=""/>
       <img v-if="hover===power.kind&&!power.locked&&!power.remaining" :style="image('ingame_ui_power_button_frame_active_hover',-29.5,-40)" src="/assets/ingame_ui_power_button_frame_active_hover.png" alt=""/>
       <img v-if="power.locked" :style="image('ingame_ui_power_loading',-4.5,-10)" src="/assets/ingame_ui_power_loading.png" alt=""/>
       <img v-if="power.remaining>0" data-power-cooldown :data-cooldown="power.cooldown" :style="{...image('ingame_ui_power_loading',-4.5,-9),clipPath:`inset(${powerCooldownPhase(power.remaining,power.cooldown)*100}% 0 0 0)`}" src="/assets/ingame_ui_power_loading.png" alt=""/>
-      <img v-if="door(power)" :style="image('ingame_ui_power_button_doors_0001',-1.5,-8)" :src="'/assets/ingame_ui_power_button_doors_'+String(door(power)).padStart(4,'0')+'.png'" alt=""/>
+      <img v-if="door(power)" :style="image('ingame_ui_power_button_doors_0001',-1.5,-8)" :src="'assets/ingame_ui_power_button_doors_'+String(door(power)).padStart(4,'0')+'.png'" alt=""/>
       <img :style="image('ingame_ui_power_button_frame_inactive',-21.5,-40)" src="/assets/ingame_ui_power_button_frame_inactive.png" alt=""/>
       <img v-if="power.selected" :style="image('ingame_ui_power_button_frame_select',-21.5,-37)" src="/assets/ingame_ui_power_button_frame_select.png" alt=""/>
       <img :style="image('ingame_ui_power_button_input_frame',15,0)" src="/assets/ingame_ui_power_button_input_frame.png" alt=""/><span class="power-key">{{index+1}}</span>

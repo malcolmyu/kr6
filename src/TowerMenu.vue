@@ -53,9 +53,9 @@ function image(item:typeof items.value[number]){return armed.value===item.key?it
 <template>
   <aside class="tower-menu radial-menu" :aria-label="site.tower?'管理防御塔':'建造防御塔'" :style="{left:center.x+'%',top:center.y+'%',transform:`scale(${scale})`}">
     <button v-for="item in items" :key="item.key" class="radial-action" :style="style(item)" :disabled="item.disabled" :aria-label="item.label" :aria-pressed="armed===item.key" :title="item.tt_title" @click="activate(item)">
-      <img :src="'/assets/'+image(item)+'.png'" alt=""/>
-      <img v-for="rank in item.rank!==undefined?3:0" :key="rank" class="power-rank" :style="rankStyle(rank-1,rankImage(item,rank))" :src="'/assets/'+rankImage(item,rank)+'.png'" alt=""/>
-      <img v-if="item.key===purchased&&time-purchaseAt<.4" class="power-buy-fx" :src="'/assets/effect_powerbuy_'+String(Math.max(1,Math.min(12,Math.ceil((time-purchaseAt)*30)))).padStart(4,'0')+'.png'" alt=""/><span class="price" v-if="item.price!==undefined"><span class="price-number">{{item.price}}</span></span>
+      <img :src="'assets/'+image(item)+'.png'" alt=""/>
+      <img v-for="rank in item.rank!==undefined?3:0" :key="rank" class="power-rank" :style="rankStyle(rank-1,rankImage(item,rank))" :src="'assets/'+rankImage(item,rank)+'.png'" alt=""/>
+      <img v-if="item.key===purchased&&time-purchaseAt<.4" class="power-buy-fx" :src="'assets/effect_powerbuy_'+String(Math.max(1,Math.min(12,Math.ceil((time-purchaseAt)*30)))).padStart(4,'0')+'.png'" alt=""/><span class="price" v-if="item.price!==undefined"><span class="price-number">{{item.price}}</span></span>
     </button>
     <button class="cancel" aria-label="取消" @click="emit('cancel')"/>
     <div v-if="tooltip" class="tower-tooltip"><strong>{{tooltip.tt_title??(tooltip.action==='tw_sell'?'出售防御塔':'升级防御塔')}}</strong><p v-if="tooltip.tt_desc">{{tooltip.tt_desc}}</p><span>再次点击确认</span></div>

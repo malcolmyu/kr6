@@ -27,10 +27,10 @@ const hitStyle=computed(()=>{const hit=props.node.hit_rect??{pos:{x:0,y:0},size:
 </script>
 <template>
  <div v-if="!hidden" class="native-ui-node" :class="{label}" :style="style" :data-ui-node="node.id">
-  <img v-if="halo&&node.focus_image_order===1" class="native-ui-art native-ui-halo" :style="haloStyle" :src="'/assets/'+halo+'.png'" alt=""/>
+  <img v-if="halo&&node.focus_image_order===1" class="native-ui-art native-ui-halo" :style="haloStyle" :src="'assets/'+halo+'.png'" alt=""/>
   <NativeNineSlice v-if="image&&node.slice_rect" :name="image" :size="size" :image-size="images[image]" :slice="node.slice_rect" :overdraw="node.overdraw_sides"/>
-  <img v-else-if="image" class="native-ui-art" :style="artStyle" :src="'/assets/'+image+'.png'" alt=""/>
-  <img v-if="halo&&node.focus_image_order!==1" class="native-ui-art native-ui-halo" :style="haloStyle" :src="'/assets/'+halo+'.png'" alt=""/>
+  <img v-else-if="image" class="native-ui-art" :style="artStyle" :src="'assets/'+image+'.png'" alt=""/>
+  <img v-if="halo&&node.focus_image_order!==1" class="native-ui-art native-ui-halo" :style="haloStyle" :src="'assets/'+halo+'.png'" alt=""/>
   <span v-if="label" class="native-ui-text" :style="textFilter"><span v-if="textOutline" class="native-ui-text-outline" aria-hidden="true" :data-text="node.text" :style="textOutline"/><span class="native-ui-text-fill" :style="textFill">{{node.text}}</span></span>
   <button v-if="button" class="native-ui-hit" :style="hitStyle" :aria-label="node.label??node.id" :disabled="node.disabled" @focus="focused=true" @blur="focused=false" @pointerenter="hover=true" @pointerleave="hover=false" @click.stop="emit('action',node.action!)"/>
   <NativeSlider v-if="node.class==='GG5Slider'&&node.control" :node="node" :images="images" @change="(id,value)=>emit('change',id,value)" @sound="emit('sound',$event)"/>

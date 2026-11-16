@@ -32,10 +32,10 @@ const pauseStyle=computed(()=>{
   <div ref="root" class="hud native-hud" aria-label="战斗状态">
     <div class="gui-plane" :style="planeStyle">
       <div class="hud-panel" :style="panelStyle">
-        <img class="hud-background" :src="'/assets/'+variant.hud.image_name+'.png'" alt=""/>
+        <img class="hud-background" :src="'assets/'+variant.hud.image_name+'.png'" alt=""/>
         <span v-for="label in labels" :key="label.key" class="hud-number" :data-hud="label.key" :data-wave="label.key==='wave'?wave:undefined" :aria-label="label.aria" :style="label.style">{{label.value}}</span>
       </div>
-      <button class="native-pause" :style="pauseStyle" :disabled="disabled" :aria-label="paused?'继续':'暂停'" :aria-pressed="paused" @pointerenter="hovered=true" @pointerleave="hovered=false" @click="emit('pause')"><img :src="'/assets/'+pauseImage+'.png'" alt=""/></button>
+      <button class="native-pause" :style="pauseStyle" :disabled="disabled" :aria-label="paused?'继续':'暂停'" :aria-pressed="paused" @pointerenter="hovered=true" @pointerleave="hovered=false" @click="emit('pause')"><img :src="'assets/'+pauseImage+'.png'" alt=""/></button>
     </div>
   </div>
 </template>

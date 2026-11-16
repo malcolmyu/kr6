@@ -18,7 +18,7 @@ export class OutcomeRenderer {
  }
  async load(){
   const loader=new THREE.TextureLoader(),maps:Record<string,THREE.Texture>={}
-  await Promise.all(this.data.textures.map(async name=>{maps[name]=await loader.loadAsync('/assets/'+name)}))
+  await Promise.all(this.data.textures.map(async name=>{maps[name]=await loader.loadAsync('assets/'+name)}))
   if(this.disposed){Object.values(maps).forEach(t=>t.dispose());return}
   this.textures=Object.values(maps);this.atlas=new SpriteAtlas(this.data.atlas,maps)
   const choices=outcomePlan(this.outcome.kind,this.outcome.stars,this.iron,this.data.noGems).actors

@@ -155,20 +155,20 @@ export class WorldRenderer {
   async load(level: number, mode: GameMode = 'campaign',firstCampaignComplete=false,stageComplete=false,restarted=false,heroXp:Record<string,number>={},playerLevel=0,selectedPowers:PowerKind[]=['reinforcements','rain_of_fire'],heroUpgrades:Record<string,string[]>={},selectedTowers:import('./TowerSystem').TowerKind[]=['archers','knights','catapult'],onboarding:{stage1?:true;stage2?:true}={},powerXp:Partial<Record<PowerKind,number>>={},powerUpgrades:PowerUpgradeSelection={},globalUpgrades:GlobalUpgradeSelection={}): Promise<LevelData> {
     const generation = ++this.generation
     const prefix = `level${String(level).padStart(2, '0')}`
-    const response = await fetch(`/data/${prefix}.json`)
+    const response = await fetch(`data/${prefix}.json`)
     if (!response.ok) throw new Error('无法读取关卡数据')
     const data: LevelData = await response.json()
     const manager=new THREE.LoadingManager();manager.onProgress=(_url,loaded,total)=>this.onLoadProgress(total?loaded/total:0)
     const loader = new THREE.TextureLoader(manager)
     const [texture, enemyTexture, frames, animations, templates, program,towers,stageArt,tutorialArt] = await Promise.all([
-      loader.loadAsync(`/assets/go_stage${String(level).padStart(2, '0')}_bg-1.png`),
-      loader.loadAsync('/assets/go_enemies_T1-1.png'),
-      this.json('/data/enemies-atlas.json'), this.json('/data/enemies-animations.json'),
-      this.json('/data/entities.json'), this.json(`/data/${prefix}-${mode}.json`),this.json('/data/towers-art.json'),this.json(`/data/${prefix}-art.json`),this.json('/data/tutorial.json')
+      loader.loadAsync(`assets/go_stage${String(level).padStart(2, '0')}_bg-1.png`),
+      loader.loadAsync('assets/go_enemies_T1-1.png'),
+      this.json('data/enemies-atlas.json'), this.json('data/enemies-animations.json'),
+      this.json('data/entities.json'), this.json(`data/${prefix}-${mode}.json`),this.json('data/towers-art.json'),this.json(`data/${prefix}-art.json`),this.json('data/tutorial.json')
     ])
     const towerArt={atlas:{...towers.atlas,...stageArt.atlas},exos:{...towers.exos,...stageArt.exos},animations:{...towers.animations,...stageArt.animations},textures:[...new Set<string>([...towers.textures,...stageArt.textures])]}
     const towerTextures:Record<string,THREE.Texture>={}
-    await Promise.all(towerArt.textures.map(async(name:string)=>{towerTextures[name]=await loader.loadAsync(`/assets/${name}`)}))
+    await Promise.all(towerArt.textures.map(async(name:string)=>{towerTextures[name]=await loader.loadAsync(`assets/${name}`)}))
     if (this.disposed || generation !== this.generation) { texture.dispose(); enemyTexture.dispose();Object.values(towerTextures).forEach(t=>t.dispose()); return data }
     this.clear()
     texture.colorSpace = THREE.SRGBColorSpace

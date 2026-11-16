@@ -266,3 +266,7 @@ B 站页面返回 HTTP 412，但视频元数据接口已成功读取，存档于
 
 
 泽菲拉弱化光环已按原始raw护甲函数、刷新/离场与死亡暂停接入，运行 `npm run test:zefira-talents` 可检查原双层特效与护甲变化。暴击天赋和终极技仍在开发；整体目标尚未完成。
+
+## GitHub Pages
+
+试玩地址：https://malcolmyu.github.io/kr6/ 。使用 `npm run build:pages` 构建到 `dist/`，发布到 `gh-pages` 分支。仓库 Settings → Pages → Deploy from a branch，选择 `gh-pages` / `(root)`。运行时图片、数据和音频使用相对站点目录的 URL，以支持 `/kr6/`。

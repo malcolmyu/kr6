@@ -25,8 +25,8 @@ export class SceneTransitionRenderer {
   const layout=guiLayout(w,h,true),width=w/layout.scale,height=h/layout.scale;this.scale=layout.sw/1024;this.renderer.setSize(w,h);this.camera.left=-width/2;this.camera.right=width/2;this.camera.top=height/2;this.camera.bottom=-height/2;this.camera.updateProjectionMatrix();if(this.actor)this.actor.root.scale.setScalar(this.scale);this.onResize(w,h)
  }
  async load(){
-  const r=await fetch('/data/scene-transition.json');if(!r.ok)throw new Error('转场资源载入失败');const data:TransitionData=await r.json(),loader=new THREE.TextureLoader(),maps:Record<string,THREE.Texture>={}
-  await Promise.all(data.textures.map(async name=>{maps[name]=await loader.loadAsync(`/assets/${name}`)}))
+  const r=await fetch('data/scene-transition.json');if(!r.ok)throw new Error('转场资源载入失败');const data:TransitionData=await r.json(),loader=new THREE.TextureLoader(),maps:Record<string,THREE.Texture>={}
+  await Promise.all(data.textures.map(async name=>{maps[name]=await loader.loadAsync(`assets/${name}`)}))
   if(this.disposed){Object.values(maps).forEach(t=>t.dispose());return}
   this.textures=Object.values(maps);this.atlas=new SpriteAtlas(data.atlas,maps);this.actor=new ExoSprite(this.atlas,data.exo,.5);this.scene.add(this.actor.root);this.resize();return data
  }

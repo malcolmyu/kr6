@@ -16,7 +16,7 @@ function position(flag:WaveEntrance){const point=props.project(flag.pos);return 
       <img v-show="hovered===flag.path||confirm" class="halo" src="/assets/waveFlag_selected.png" alt=""/>
       <img class="circle" src="/assets/waveFlag_0003.png" alt="" :style="circleStyle"/>
       <img class="pointer" src="/assets/waveFlag_0004.png" alt="" :style="{transform:`rotate(${flag.r}rad)`}"/>
-      <img class="icon" :src="incoming.flyingPaths?.includes(flag.path)?'/assets/waveFlag_0002.png':'/assets/waveFlag_0001.png'" alt=""/>
+      <img class="icon" :src="incoming.flyingPaths?.includes(flag.path)?'assets/waveFlag_0002.png':'assets/waveFlag_0001.png'" alt=""/>
       <button class="next-wave wave-hit" :disabled="disabled" :aria-label="index===0?(confirm?'确认出击':incoming.number===1?'开始战斗':'下一波'):`敌军入口 ${flag.path}`" :title="incoming.number===1?'召唤第一波':`提前召唤：${Math.floor(incoming.remaining+.5)} 金币`" @pointerenter="hovered=flag.path" @pointerleave="hovered=undefined" @click="emit('call')"/>
     </div>
   </div>

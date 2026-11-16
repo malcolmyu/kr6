@@ -10,7 +10,7 @@ const viewport=ref<HTMLElement>(),state=ref<'loading'|'ready'|'splash'|'menu'>('
 const slotArt=ref<SlotMenuArt>()
 let renderer:OpeningRenderer|undefined,disposed=false
 onMounted(async()=>{
- try{renderer=new OpeningRenderer(viewport.value!);renderer.onMenu=()=>{state.value='menu';emit('menu')};await Promise.all([renderer.load(),(async()=>{const response=await fetch('/data/slots.json');if(!response.ok)throw new Error('存档界面载入失败');const data:SlotMenuArt=await response.json();await preloadNativeImages(Object.keys(data.images).map(n=>'/assets/'+n+'.png'));if(!disposed){slotArt.value=data;renderer!.menuMotion=data.menuFrames}})()]);if(!disposed)state.value='ready'}catch(e){error.value=String(e)}
+ try{renderer=new OpeningRenderer(viewport.value!);renderer.onMenu=()=>{state.value='menu';emit('menu')};await Promise.all([renderer.load(),(async()=>{const response=await fetch('data/slots.json');if(!response.ok)throw new Error('存档界面载入失败');const data:SlotMenuArt=await response.json();await preloadNativeImages(Object.keys(data.images).map(n=>'assets/'+n+'.png'));if(!disposed){slotArt.value=data;renderer!.menuMotion=data.menuFrames}})()]);if(!disposed)state.value='ready'}catch(e){error.value=String(e)}
 })
 async function start(){
   state.value='splash'

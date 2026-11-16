@@ -38,7 +38,7 @@ function action(name:string){
 function resize(){viewport.value={w:innerWidth,h:innerHeight}}
 function key(e:KeyboardEvent){if(e.key==='Escape'){e.stopPropagation();back()}}
 function tick(now:number){age.value+=previous?Math.min(.1,(now-previous)/1000):0;previous=now;handle=requestAnimationFrame(tick)}
-onMounted(async()=>{addEventListener('resize',resize);addEventListener('keydown',key);try{const response=await fetch('/data/power-room.json');if(!response.ok)throw Error('法术房间载入失败');const art=await response.json();await preloadNativeImages(Object.keys(art.images).map(name=>'/assets/'+name+'.png'));if(!disposed){data.value=art;handle=requestAnimationFrame(tick)}}catch(e){error.value=String(e)}})
+onMounted(async()=>{addEventListener('resize',resize);addEventListener('keydown',key);try{const response=await fetch('data/power-room.json');if(!response.ok)throw Error('法术房间载入失败');const art=await response.json();await preloadNativeImages(Object.keys(art.images).map(name=>'assets/'+name+'.png'));if(!disposed){data.value=art;handle=requestAnimationFrame(tick)}}catch(e){error.value=String(e)}})
 onBeforeUnmount(()=>{disposed=true;timers.forEach(clearTimeout);cancelAnimationFrame(handle);removeEventListener('resize',resize);removeEventListener('keydown',key)})
 </script>
 <template>

@@ -22,7 +22,7 @@ function animate(now:number){const dt=previous?Math.min(.1,(now-previous)/1000):
 function action(name:string){emit('sound','GUIButtonCommon');if(name==='button_vd_restart')emit('restart');else emit('continue')}
 onMounted(async()=>{
  observer=new ResizeObserver(entries=>{const r=entries[0].contentRect;size.value={width:r.width,height:r.height}});observer.observe(root.value!)
- try{const response=await fetch('/data/outcome.json');if(!response.ok)throw new Error('结算资源载入失败');data.value=await response.json();await document.fonts.ready;if(disposed)return;renderer=new OutcomeRenderer(canvas.value!,data.value!,props.outcome,props.iron);await renderer.load();if(disposed)return;ready.value=true;emit('ready');handle=requestAnimationFrame(animate)}catch(e){error.value=String(e)}
+ try{const response=await fetch('data/outcome.json');if(!response.ok)throw new Error('结算资源载入失败');data.value=await response.json();await document.fonts.ready;if(disposed)return;renderer=new OutcomeRenderer(canvas.value!,data.value!,props.outcome,props.iron);await renderer.load();if(disposed)return;ready.value=true;emit('ready');handle=requestAnimationFrame(animate)}catch(e){error.value=String(e)}
 })
 onBeforeUnmount(()=>{disposed=true;cancelAnimationFrame(handle);observer?.disconnect();renderer?.dispose()})
 </script>
