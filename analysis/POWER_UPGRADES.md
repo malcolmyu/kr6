@@ -1,0 +1,19 @@
+# Native power upgrade foundation
+
+Current update: the ordinary map power room now supports purchases, branch replacement, per-power reset, explicit equipment slots and saved reloads. Royal reset is connected to the currently implemented Wizard B/Archer B skill controllers. See POWER_ROOM.md; mentions of pending room work below describe the earlier milestone. Full combat/video acceptance remains incomplete.
+
+The goal remains the full Vue/TypeScript/Three.js recreation through3-2. This change establishes native skill-tree rules, saved purchases and session-local stat patches. It does **not** complete the power room or high-tier power scripts, and does not establish six-flow/video/audio parity.
+
+`scripts/export_power_upgrades.lua` loads the original KGraphDictionary loader/evaluator (`kviews_screen_map_game.lua5129/5238`), phone map upgrade definitions, and the original `upgrades.patch_templates` private `patch_upgrades` function (`6295–6390`). It substitutes only the template getter with fresh native clones, retains native priority/path/operator handling, and executes51 legal prefix combinations. It also executes357 graph/point states. Power points are level−1; purchasing one branch excludes its alternative. Leveling does not automatically purchase a node.
+
+`PowerUpgrades.ts` matches all exported patch snapshots and graph results, including priority-ordered reinforcement damage/armor/HP/prefix changes. Saved `Progress.powerUpgrades` is validated against saved power XP, prerequisite order, costs and mutually exclusive branches. Invalid, duplicate and unaffordable nodes are discarded. Existing profiles default to no purchased upgrades.
+
+App→WorldRenderer→GameSession now restores those legal purchases. Each session clones only modified templates before constructing its combat systems. Global data and other sessions remain unchanged. Royal Edict receives its purchased nodes through its existing controller configuration. Reinforcement template spike armor now participates in actual soldier health/reflection. Atlas soldier scale now respects the original template scale, including level3's.9 scale.
+
+Verification:
+
+- `verify_power_upgrades.mjs` compares51 native patch combinations and357 native graph states. It checks legal save reconstruction and point budgets, then actual session cooldowns, rain damage45→50 for l2b, reinforcement melee damage3→5 for l2a, lifetime12→17 for l2b, Royal range factor1→1.2, and template spike reflection. A following fresh session retains base stats.
+- `npm run test:power-upgrades` loads a seeded legal rank2 profile in an isolated headless browser, uses ordinary keyboard/ground-placement casts, observes reinforcement factor1.5 and rain cooldown55s, verifies Royal range and reload persistence, and rejects conflicting/over-budget saved nodes. It uses a no-enemy wave fixture; this is a saved-upgrade integration test, not natural video acceptance. No page/asset errors. Browser closed after completion.
+- Full existing npm test passed after the runtime integration. The new verifier is now included in npm test; final combined check recorded in `power-upgrades-final-tests.log`. Build recorded in `power-upgrades-build.log`.
+
+Remaining work: original power room presentation/roster/equip/reset/purchase flow; complete reinforcement native-battle phase comparison (special controller/aura/three-part attack now implemented; see REINFORCEMENTS.md); complete rain particle/native-battle comparison (scorch/burn/slow/extra explosion/cataclysm now implemented; see RAIN_OF_FIRE.md); Royal reset-tower-skills callback; complete visual/timing/audio and natural six-flow acceptance. Higher-tier template flags are represented faithfully but their missing controllers must still be implemented before claiming those upgrades work end to end. No power-room purchase UI is exposed yet.

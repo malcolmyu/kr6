@@ -1,0 +1,7 @@
+EXPORT_ENTITIES_NO_WRITE=true;dofile('scripts/export_entities.lua')
+local E,J=require('entity_db'),require('dkjson');assert(os.execute('python3 scripts/extract_luajit_functions.py reference/apk/assets/gc64/sequels/game_gui.lua 7932')==0)
+local fn=assert(loadfile('analysis/function-bytecode/game_gui_line7932.lua'));local store={ts=100};local bindings={km=require('klua.macros'),game_gui={game={store=store}},GS={power_xp_tracking_system=false}}
+for i=1,20 do local name=debug.getupvalue(fn,i);if not name then break end;assert(bindings[name],name);debug.setupvalue(fn,i,bindings[name])end
+local previous=KImageView;KImageView={update=function()end};local cooldowns={reinforcements=E:create_entity('soldier_reinforcement_base').cooldown,rain_of_fire=E:create_entity('power_rain_of_fire_control').cooldown,royal_edict=E:create_entity('power_royal_edict_control').cooldown};local rows={}
+for kind,duration in pairs(cooldowns)do for _,remaining in ipairs({duration+1,duration,duration-1/30,duration*.5,1,0,-1})do local button={mode='cooldown',tm={start_ts=100},cooldown_time=duration,is_blocked=function()return false end,set_mode=function(self,mode)self.mode=mode end};store.ts=100+duration-remaining;fn(button,1/30);rows[#rows+1]={kind=kind,cooldown=duration,remaining=remaining,phase=button.tm.phase,mode=button.mode}end end
+KImageView=previous;local f=assert(io.open('analysis/power-cooldown-oracle.json','w'));f:write(J.encode({cooldowns=cooldowns,frames=rows}));f:close();print('Original GGPowerButton7932 phase/ready boundaries and native per-power cooldowns exported')

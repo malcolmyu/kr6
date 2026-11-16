@@ -1,0 +1,31 @@
+# Native global tower upgrades: room and static runtime
+
+The APK's `upgrades` module defines four classes: archers, barracks, mages and artillery. `scripts/export_global_upgrades.lua` executes original patch/graph functions, using `balance_hex.tsv` and phone `map_data.lua` costs. The runtime export contains 28 upgrade definitions; the analysis exports retain 36 original patch sets, 756 graph states and 168 base templates. `verify_global_upgrades.mjs` compares the patch operators, graph prerequisites, branch exclusivity, shared upgrade-point budget and immutable base templates.
+
+**Budget correction:** `UpgradesRoomView.available_points` (original6348) uses the highest non-empty completed level entry and `GS.upgrades_points_per_stage`, not earned stars. The table starts0/2/4/6; the first three stages provide at most4 points.54 original room calculations confirm that campaign star rating and iron completion do not add points. Earlier11/12-star and10-point video-profile claims were incorrect and are superseded. ProgressStore now sanitizes selections with the native stage budget.
+
+Saved legal selections now pass through ProgressStore, App, WorldRenderer and GameSession. Old saves continue with no global selections. Static patches apply after power patches on per-session templates. Mage l1 multiplies only minimum damage by 1.15: the first wizard bolt has min6.9/max9, yielding the video's 7–9 tooltip without changing the100-gold price. Mage l2 separately rounds its price to90. Artillery l1 increases the catapult explosion radius60→66; it does not increase catapult range (that patch targets a different family).
+
+The normal map 升级 entry now opens the original four-tree desktop room: native artwork, Chinese labels, point counter, selected/available/unavailable/swap states, double-click confirmation, original sounds, purchase effect, reset-all and original anim_in/anim_out frame traces. Legal selections persist immediately and affect the next battle.1008 original node confirmations and branch-transfer results compare, including insufficient/shared-budget cases. Higher-budget branch cases are isolated controller tests; they are not legal first-three-stage saves.
+
+The default-URL browser test performs actual purchases (mage l1/l2 plus artillery l1, total4), rejects an extra artillery l2, reloads, resets all trees, repurchases, checks a tall viewport and enters the original stage3 campaign to verify min6.9/max9, wizard price90 and catapult radius66. It does not override native waves/enemy stats. Screenshots `web-global-room-main.png`, `web-global-room-purchased.png` and `web-global-room-tall.png` are inspected. Purchase FX cleanup compares primitive identities to avoid retaining Vue-proxied objects.
+
+Function-valued patches retain native descriptors; barracks l4a's damage callback and mage l4b's wizard-count controller are not executed yet. These are above the first-three-stage budget. Other global controller/aura behaviors require their own native verification before claiming the entire tree works. Tooltip layout currently shares the web room's approximate text sizing; original font/shader/wrap and complete video/audio fidelity remain unverified.
+
+## Explosive penetration correction
+
+Native artillery l3b sets `bullet.explosive_factor=.75`. RangedCombat previously dropped this field when constructing impact damage; it now passes it to `predictDamage`. CulverineRay already passes its corresponding aura field.
+
+`export_global_artillery_impact.lua` runs the actual native generic bomb insert/update and `utils.predict_damage`, with and without the original artillery l1/l2/l3b patches. The 48 traces cover four ranks, damage factors1/1.75, bandit/blackguard/shadow-blades armour and offsets0/20/50. `verify_global_artillery_impact.mjs` compares144 actual RangedCombat health changes, including queue insertion and already-fired projectile survival after source sale. Original path validity and dry terrain are supplied as fixed fixture conditions; these traces do not verify global simulation ordering or navigation.
+
+For example, rank1, factor1, blackguard, centre impact: unupgraded original raw19→16 applied; with l1/l2/l3b original raw20→18 applied. Both match the web runtime. The l2 damage and l1 radius changes are included, so this example is not attributed solely to penetration.
+
+Verification: original export, complete `npm test` (including the new impact comparison), TypeScript/production build passed. Ordinary purchase-room browser verification is logged in `global-room-browser.log`; the earlier saved-selection check remains in `global-upgrades-browser.log`. The existing build bundle-size warning remains. No full-video acceptance or new six-route natural playthrough is established by these tests.
+
+The native ultimate path costs1+2+3+3+5=14 points, versus4 available through stage3. This budget constraint does not prove that all requested content is complete.
+
+Reproduce with `luajit scripts/export_global_upgrades.lua`, `luajit scripts/export_global_room.lua`, `luajit scripts/export_global_room_oracle.lua`, `node scripts/verify_global_upgrades.mjs`, `node scripts/verify_global_room.mjs`, and `npm run test:global-room`. The full web exporter/test chain includes these sources/checks.
+
+The full-export regression exposed shared-process contamination: bomb traces after many prior native fixtures could disagree with the same standalone original trace (including partially changed projectile template fields). The new global exporters now execute in fresh LuaJIT processes; impact verification also compares the native patched min/max/radius before comparing health changes. The precise legacy producer responsible for all observed differences has not been identified. Failed shared-process evidence is retained in `global-room-shared-process-failure.log` and `global-artillery-impact-shared-process.json`; it is not accepted as the native expected result.
+
+Final checks after isolation: full native web export, complete npm test, production build, `test:global-room` and existing `test:power-room` regression passed. Both browser processes closed normally. An additional fresh original impact export compared equal after JSON decoding. The existing build bundle-size warning remains.

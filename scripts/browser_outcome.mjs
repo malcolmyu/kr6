@@ -1,0 +1,40 @@
+import {selectDefaultSlot} from './browser_helpers.mjs'
+import {chromium} from '@playwright/test'
+import assert from 'node:assert/strict'
+import {installReplayFixture,waitForGame,skipComic} from './browser_helpers.mjs'
+const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true})
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],missing=[]
+ page.on('pageerror',e=>{errors.push(e.message);console.log('PAGE ERROR',e.message)});page.on('response',r=>{if(r.status()>=400)missing.push(r.url())})
+ await page.addInitScript(()=>localStorage.setItem('kingdom-rush-6.progress.v1',JSON.stringify({levels:{1:{campaign:3}},onboarding:{stage1:true}})))
+ await installReplayFixture(page)
+ await page.route('**/data/level01-campaign.json',route=>route.fulfill({json:{format:'tsv',commands:[{name:'gold',value:175},{name:'lives',value:20},{name:'wave',wait_time:-1},{name:'wait',wait_time:.1}]}}))
+ await page.route('**/data/level01-iron.json',route=>route.fulfill({json:{format:'tsv',commands:[{name:'gold',value:260},{name:'lives',value:0}]}}))
+ await page.goto('http://127.0.0.1:5173/?debug=1')
+ await page.getByRole('button',{name:'开始游戏',exact:true}).click();await page.getByRole('button',{name:'点击开始',exact:true}).click();await selectDefaultSlot(page);await waitForGame(page)
+ await page.getByRole('button',{name:'开始战斗',exact:true}).click()
+ await page.locator('[data-outcome="victory"]').waitFor()
+ await page.waitForFunction(()=>Number(document.querySelector('[data-outcome-time]')?.getAttribute('data-outcome-time'))>=1)
+ await page.screenshot({path:'analysis/web-native-victory-enter.png'})
+ await page.locator('.native-outcome').getByRole('button',{name:'继续',exact:true}).waitFor()
+ await page.waitForTimeout(1200);await page.screenshot({path:'analysis/web-native-victory-stars.png'})
+ assert.equal(await page.locator('[data-outcome-node=label_victory]').innerText(),'胜利')
+ assert.equal(await page.locator('[data-outcome-node=label_gems_amount]').count(),0,'Reference desktop no-gems branch must hide the gem counter')
+ await page.locator('.native-outcome').getByRole('button',{name:'继续',exact:true}).click()
+ await page.locator('.comic-screen').waitFor();await page.locator('.comic-hit').waitFor()
+ await page.waitForFunction(()=>Number(document.querySelector('.comic-screen')?.getAttribute('data-frame'))>=20)
+ await page.screenshot({path:'analysis/web-post-victory-comic.png'});await skipComic(page)
+ await page.getByLabel('王国地图',{exact:true}).waitFor();await page.locator('.native-map').getByRole('button',{name:'2. 奥术魔法学院',exact:true}).waitFor()
+ await page.screenshot({path:'analysis/web-native-map-after-victory.png'})
+ await page.locator('.native-map').getByRole('button',{name:'2. 奥术魔法学院',exact:true}).click();await page.getByRole('button',{name:'战役',exact:true}).click();await page.getByRole('button',{name:'战斗',exact:true}).click();await waitForGame(page)
+ assert.equal(await page.locator('[data-hud=gold]').innerText(),'450')
+ await page.getByRole('button',{name:'1. 利尼维亚城堡',exact:true}).click();await waitForGame(page)
+ await page.getByRole('button',{name:'开始战斗',exact:true}).click();await page.locator('[data-outcome="victory"]').waitFor();await page.locator('.native-outcome').getByRole('button',{name:'继续',exact:true}).click();await page.locator('.native-map').waitFor();assert.equal(await page.locator('.comic-screen').count(),0,'comic2 is remembered after its first presentation')
+ await page.locator('.native-map').getByRole('button',{name:'1. 利尼维亚城堡',exact:true}).click();await page.getByRole('button',{name:'战役',exact:true}).click();await page.getByRole('button',{name:'战斗',exact:true}).click();await waitForGame(page)
+ await page.getByLabel('模式',{exact:true}).selectOption('iron');await page.locator('[data-outcome="defeat"]').waitFor()
+ await page.locator('.native-outcome').getByRole('button',{name:'继续',exact:true}).waitFor();await page.waitForTimeout(1000)
+ await page.screenshot({path:'analysis/web-native-defeat-iron.png'})
+ assert.equal(await page.locator('.native-hud').isVisible(),false)
+ assert.deepEqual(errors,[]);assert.deepEqual(missing,[])
+ console.log('Browser outcome fixture: original victory/defeat EXOs, three-star and iron badge UI, native button timeline, victory-to-comic2-to-map, saved completion exposes level two, real level-two load; no asset/page errors. Full natural playthrough remains pending.')
+}finally{await browser.close()}

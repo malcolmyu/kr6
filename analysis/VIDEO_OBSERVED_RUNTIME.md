@@ -1,0 +1,36 @@
+# Longer observed-opening differential: spatial hero targeting and smoke continuation
+
+The previous goal turn implemented Gerald's actual modifier bodies and passed a complete mixed2782-frame input. This turn extends the original runtime export using all17 recorded/inferred actions in `reference-inputs/page06-opening.json` through media118.5s. It retains the same inferred save profile,13.5s scene origin, controlledLCG104 and original level/waves. The17actions include powers and two later wizard builds. They are observations with timing/placement uncertainty, not an exact native input recording.
+
+## Affordability correction in the evidence harness
+
+The82–83s wizard build window's midpoint maps to tick2071. Both engines have95gold there. The exporter previously assigned the native upgrade flag directly, bypassing the GUI's affordability guard; the native system then deducted100 and produced-5gold. The webpage correctly refused it. This invalid midpoint export must not support a claim of ordinary playable inputs.
+
+The exporter now asserts affordability using the actual level-one tower template's price before applying a build flag. The build-animation template's own price is0 and is unsuitable for this check. The original midpoint input is retained in `native-runtime-video-observed-midpoint-input.json`; a direct native recheck rejects2071 with95<100. The valid prepared input instead issues this build at2082, the first tick after the5gold reward at2081. It corresponds to media82.8667s, within the same observed82–83s window. This is a feasible interpretation of the window, not proof that the reference click occurred at that exact time. No gold or combat balance was changed.
+
+The valid4500-frame original export has7707events,1life/288gold/wave1/no outcome at its endpoint, with no missing resources/animations. Its full web differential currently fails at2386. The later powers are therefore not yet proved by this new comparison.
+
+## Production corrections
+
+- `HeroRangedCombat.acquire` now uses the actual SSO candidate cells, radius `max_range+node_prediction*150`, and native unstable Lua sort by nodes to goal. The previous web collection/stable-sort query chose enemy97 where native chose99 for a Zefira shot. Both engines consumed the same RNG and created the same bullet ID, so the old check only detected the difference much later at impact2140. Candidate/target/trajectory checks now expose this class of mistake directly.
+- Gerald's automatic return to rally continues courage acquisition/retry checks, just as automatic approach does. Explicit user deployment remains gated. The old automatic-return gate shifted the next courage cast from native2266 to web2265.
+- Shadow blades waiting for their blocker cannot check smoke early. Once the blocker is ready, the native mixed-melee helper checks its skill predicate, returns, and yields; the outer main starts smoke on the following tick. `EnemyMelee.beforeAbility` and `EnemySkills.canStartShadow` now express that continuation. Walking interruption has a different return path and starts the outer ability in the same tick; preserving that distinction is required by the older Royal-global fixture.
+
+An initial attempted smoke change moved death/stun cancellation before the deadline check. Independent original wait-function cases contradicted that change: at the exact elapsed deadline the native `U.y_wait149` may return without rechecking its abort callback. That attempted change was reverted. The real video-profile issue was a premature cast while still in blocker-wait, not a universal deadline-death rule. The expanded original oracle retains35cases including deadline death across five starting clocks; no native expectation was changed to accommodate production.
+
+## Evidence and limits
+
+- `verify_hero_ranged_spatial.mjs`:144 original SU ranged/SSO/FFE cases over all3maps, mixed lanes, speeds, flying/visibility/node/range gates and Lua table deletion order.125selections,125tie cases;62chosen targets differ from stable creation order. Native candidate lists, chosen target and forecast point match.
+- `verify_native_hero_profile.mjs --observed-prefix`: first2385frames/1777events/5154draws,11892unit states,14014enemy states,2384checks/57shield/310Gerald modifier states,141hero-projectile states match. Projectile target ID, position, aim and rotation are now checked, plus Gerald's actual A/B clocks when exported. IDs/table/queues/economy/HP/positions/XP/armor and final prefix events retain their previous checks. This explicitly bounded prefix proves no outcome.
+- The unrestricted `--observed` command remains available and fails at2386: native allocates three Zefira hammer damage packets, three stun modifiers and two impact FX/decal entities; the web's legacy hammer path lacks these actual queued bodies. This is the next concrete native-controller task. The prefix gate does not replace or hide that failure.
+- Re-exporting the existing isolated Zefira bolt oracle adds only original damage-queue counts. The three point-blank cases all finish on the first main update with zero damage packets because the coroutine has not acquired its target yet. A stale browser assertion expected damage at that point; the browser assertion now follows this original behavior while retaining its ordinary moving-target8damage check.
+
+The current broader goal remains incomplete: ordinary2-2/3-2 strategies still need successful playable routes, the inferred profile still does not explain media77native70gold versus reference90, hammer and other families need actual entities, and continuous startup/construction/heard-audio/reference-video fidelity remains unproved. Final tests/build/browser/current strategy results are appended below after their live processes finish.
+
+Final verification: final npm test89820 exits0, including all prior whole-runtime inputs, new144-case spatial oracle,35smoke boundary cases and2385-frame prefix; production build95398 exits0 (existing large-chunk warning). The first full suite1352 exposed a one-tick Royal-global smoke regression caused by treating walking interruption like blocked-melee interruption; the paths are now distinguished, direct Royal-global33721 and final full suite pass.
+
+Smoke browser69327 exits0. Ranged browser48396 first failed its stale point-blank damage expectation; original bolt re-export proves zero damage packets, and updated ranged browser78629 exits0 while still verifying moving-target acquisition, actual insertion/flight/impact8damage/removal boundaries and point-blank behavior. No page/asset errors; browsers closed; flight screenshot inspected. No production behavior was changed to satisfy that stale assertion.
+
+Latest video-guard3486 exits0:1-1victory20/276.8333s,1-2victory1/152.4667,2-1victory20/431.3,2-2defeat0/127.4,3-1victory11/678.8667,3-2defeat0/63.9333. All command positions remain within native viewport. Unrestricted final comparison remains failing2386; the goal stays active/incomplete. New handles terminal; Vite remains.
+
+Follow-up: actual hammer area/stun/decal bodies now remove the2386difference. New3401-frame checked-state prefix and next enemy-archer entity3402gap are documented in [HAMMER_RUNTIME.md](HAMMER_RUNTIME.md); full observed4500/outcome parity remains unproved.

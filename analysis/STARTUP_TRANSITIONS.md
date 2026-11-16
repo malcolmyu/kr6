@@ -1,0 +1,37 @@
+# KR6 scene transition reconstruction
+
+2026-11-15. Full startup/save/settings flow and video parity are still incomplete.
+
+## Authoritative evidence
+
+- `kr6/data/exoskeletons/loadingDef.exo3`: doors_in22 frames, loading3 frames, doors_out23 frames,30fps. Uses the loading_common atlas. These are different from the older Origins project's sliding doors.
+- `sequels/screen_loading.lua`: mobile close/open cues GUITransitionClose/GUITransitionOpen; loading indicator callback resets EXO to loading and defers transition_state=closed to the following update. Indicator progress=.8*image_db.progress+.2*sound_db.progress. Mobile max_progress_speed is unlimited.
+- `kr6/kviews_screen_loading_game.lua`: actual functions31/65/88/97/107 initialise/reveal/fill/hide the sword. Filled blade uses75% maximum, shine alpha clamps progress/.1, clip has original+6 y adjustment and separate off/on/mask dimensions. Executed56 cases across four scales, out-of-range progress, debug override, hidden-before-close and reset-on-open. Export: loading-sword-oracle.json.
+- `all/director.lua` update bytecode: active loading screen continues updates while queued screen is being prepared. Initial queued screen update is2*TICK_LENGTH; a first draw is required before opening. During opening, the queued game does not continue normal updates. Raw dump: director.bytecode.txt.
+
+## Implemented
+
+- `SceneTransitionController.ts`: independent presentation clock; native22/23-frame sequence, one-update closed deferral, first-draw wait; continuous loading RAF while resources are pending; weighted actual web-loader progress; close/open sound events. Serial ownership guards stale progress/completions. Cancellation settles outstanding waits, aborts the preparation race and clears RAF. Duplicate transition requests do not start another load. Resource failure releases input/overlay ownership.
+- `SceneTransitionRenderer.ts` / `SceneTransition.vue`: original loadingDef EXO, native phone clamp geometry, original clipped sword images and handle/shine. The indicator images are decoded before the transition is ready. Both renderer and preload completion guard disposal.
+- App: close before switching away from the existing screen; prepare level/map only after close. Existing game is frozen while loading, new game receives its native initial two ticks where applicable, and is frozen through opening. Intro comic remains paused. Input is inert until transition completes. Applied to entering the game, level/mode changes, restart, post-victory map and entering a map stage.
+- WorldRenderer reports actual texture-manager completion; map preloads289 original flag/star sprites, two original backgrounds and its visible native HUD images before reporting readiness. NativeImageCache retains decoded resources and allows failed loads to be retried. Map disposal settles its pending ready signal.
+- AudioManager can preserve an already-playing transition-close voice while the outgoing scene's other sounds stop. Close/open cues are predecoded with splash startup to avoid a first-use fetch delay.
+- The older reference project's serial/input/async lifecycle pattern informed the separation, but its visual timing and assets were not copied. KR6 animation and indicator behavior use this APK's original data.
+
+## Validation and limits
+
+- Native sword56-case comparison and controller clock/progress/held-load/cancel/duplicate/failure tests pass. Controller tests check loading frames continue while preparation is held.
+- Browser transition fixture holds an actual level metadata request, captures original closing/loading/opening, checks input restoration, both original sound dispatches, a stopped battle clock through opening and repeated level switching. The loading/opening screenshots were inspected.
+- Full outcome→comic2→map→level2 browser and fresh original tutorial browser passed after integration, including real map sprite loads with no404/page errors.
+- The resource progress is the current web loader's progress, not a reconstruction of every native image/sound package's internal counter. Complete native audio package preloading and full event-by-event audio comparison remain pending.
+- Main menu/three save slots/settings, native map mode-selection/modal completeness, native outer page/frame and removal of the debug navigation are NOT completed by this transition work. The opening still proceeds into the existing battle entry rather than the complete native save/map flow.
+- Six natural battle/video comparisons through3-2 remain unproven; last natural probe was four victories/two defeats. Do not mark the overall goal achieved.
+
+## Three local save slots and main menu (2026-11-15, subsequent work)
+
+- The earlier statement that clicking the title directly enters battle is superseded: `SaveSlots.ts`, `SlotMenu.vue` and App now follow the original three-slot entry. Empty slot creates a saved profile immediately and enters the first campaign comic/tutorial. An existing profile, including one with zero stars, enters the map. Legacy single-profile progress migrates once into slot 1. Each slot independently retains levels, XP, upgrades and equipped towers/powers; active-slot compatibility mirror remains for older tooling. Confirmed deletion does not resurrect via migration.
+- `export_slots.lua` executes original `screen_slots` SlotView1588/1635/1665 and route919: 15 initial/delete/cancel/confirm row states and 6 fresh/existing routes. Original panel554/577 supplies .4s out-back/in-back position traces and deferred enable/hide callback frames. GGTimeline supplies title start animation; original screen update871 supplies startup shake and start-button scheduling after the queued two-tick update.
+- Original panel/start images, nine-slice geometry, anchors, Chinese labels and inline delete controls are exported/predecoded before startup becomes ready. The panel restores row focus and cancels deletion when closed. Battle clocks remain isolated by the scene transition.
+- Screenshot review found a general GG5Button bug: focus art is a separate halo, not a replacement image. Actual original initializer74 verifies its centring/image offsets for all menu buttons. NativeUiNode now retains the button face, draws its halo in native order and shows keyboard focus.
+- Screenshot review also found pre-existing menu background seams: the earlier doubled camera range shrank EXO part positions relative to the half-resolution GUI textures. Original GGExo drawing function1206 provides 2,896 quad corners across opening animation endpoints and every loading-door frame, matching ExoSprite with textureFactor=.5. Main-menu camera now uses original768 reference units/mobile clamp; background and logo use that half-resolution texture factor, raw positions and native shake offsets. Subsequent source execution also corrected splash: native ts=.2 starts within the animation, rather than adding a .2s delay. Actual start/GGExo update/KView frame selection/HumpTimer/fade produce259 native display poses; renderer consumes those and uses original phone1.3 scale. Loading geometry now follows the same raw-coordinate/half-resolution GUI convention, with every door frame covered in the2,896-corner comparison. Full video/shader parity remains pending.
+- Unit/native comparisons and final browser results are recorded in VIDEO_OBSERVATIONS.md. Main-menu options/settings/news/more-games, complete native map dialogs, outer debug frame removal, and full six-flow video/audio acceptance remain pending. This is not overall completion.

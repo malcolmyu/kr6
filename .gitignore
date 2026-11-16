@@ -1,0 +1,15 @@
+reference/
+tools/
+runtime/
+.DS_Store
+node_modules/
+dist/
+scripts/__pycache__/
+
+# Local reverse-engineering traces/media; reports remain versioned.
+analysis/*
+!analysis/*.md
+.env
+.env.*
+!.env.example
+*.log

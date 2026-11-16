@@ -1,0 +1,25 @@
+# Wizard acquisition and upgrade-frame continuity
+
+The original basic-wizard wrapper17989/filter17993 calls `utils.find_foremost_enemy` with a filter that checks the path node after `attack.node_prediction` (1.1666667s). Range still uses the current position; this is not future-position range acquisition. FFE additionally checks current-node validity, visibility, ellipse membership and native nodes-to-goal order. RangedCombat previously checked only the current node. `wizardTargets` now performs both validity checks before dispatching the original paired-bolt coroutine.
+
+`export_wizard_targeting.lua` runs the original wrapper, FFE, path and grid modules, with SSO disabled. It loads the three actual maps and covers every path/lane, four wizard ranks, motion speeds0/40/72, sampled nodes and target-validity transitions. There are16,848 acquisitions:8,424 origins at the nearest original tower/holder position and8,424 synthetic range boundaries.4224 actor cases have current-valid/future-invalid nodes;866 are also in current range with permitted visibility, of which two use original holder origins. Counts include repeated fixtures, not distinct enemies.
+
+All candidate IDs/order match the actual GameSession-backed RangedCombat selector. A coroutine/bolt integration check verifies shooting eligible candidates and declining a currently-in-range actor near the stage3 lower-path exit at the actual holder103,349 (rank4, pi2/spi3/node193). This fixes a real edge case but does not explain the observed opening gold discrepancy. SSO broadphase order, pending-removal/health-phase timing and complete simulation equivalence remain outside these isolated comparisons.
+
+## Between-tick upgrade crash
+
+The browser regression intermittently stopped after a wizard3→4 UI upgrade: site.template was already rank4 while the source controller still had rank3 parts, and simulation time stopped around7.37s. The rank3 caster occupies sprite index3; rank4 places a scroll at index3. Before the next30Hz logic tick, the renderer could apply the old caster's `shootloopup` pose to `wizard_scroll4Def`, which has no such animation.
+
+GameSession.upgradeTower previously cleared only the generic shooter state. It now calls RangedCombat.removeTowerState to synchronously remove generic/archer, wizard, catapult and culverine source controllers. This follows the native tower entity replacement: the next logic tick initializes the new controller. Pending/in-flight shots and autonomous payloads are retained. The renderer uses the new template's idle poses during an intervening render frame.
+
+`verify_tower_upgrade_render_state.mjs` exercises actual controllers and upgrades in all four ranged families, reproduces the invalid caster→scroll animation against the real EXO definition, and checks queued/in-flight retention. The browser harness now checks each actual upgraded level, captures failure state/errors and forces one render before the next logic tick. Its optional `--reproduce-old-state` negative control restores the former cleanup behavior in the isolated browser fixture; this must produce the missing-animation exception. The normal test exercises the corrected behavior. These are controlled regressions, not natural level completion.
+
+## Opening diagnostic
+
+The RNG scan runs600 cases: LCG seeds1–200 for mage1 alone, mage1+artillery1, and mage1+artillery1+2, all legal within4 points and preserving the observed100-gold wizard price. It uses fixed midpoint action windows, scene start13.5 and media14–82. Gold at77 is only70 or75, versus video90; no complete gold prefix matches. This does not exhaust the original Lua RNG, timing, hero profiles or full simulation state, so it cannot rule out all random/profile explanations.
+
+Additional frames72–76.5 are retained under `video-iron`, including a contact sheet. They show the first lower-path launch/impact sequence, but visual effect ownership and exact release time are not established. Do not attribute an impact to the catapult solely from a smoke/debris image. The midpoint replay still rejects wizard11 at82.5s with90 gold. No victory or full-video acceptance follows from these checks.
+
+Commands: `luajit scripts/export_wizard_targeting.lua`, `node scripts/verify_wizard_targeting.mjs`, `node scripts/verify_tower_upgrade_render_state.mjs`, `node scripts/replay_observed_opening.mjs --scan-rng`, `npm run test:wizard-tower`, `npm run test:wizard-empower`.
+
+Final verification: isolated full native export, complete npm test and production build passed. The old-behavior browser negative control produced `Missing EXO animation shootloopup`; the corrected four-rank wizard browser (with forced between-tick render) and B/empower browser regression passed without page/asset errors. All browser processes closed normally. The initial pre-fix timeout/state is retained in `wizard-upgrade-race-before-fix.log`; the native renderer-state reproduction and negative control identify its cause. The existing bundle-size warning remains. Full3-2 video/audio acceptance and the historical two natural-route defeats remain unresolved.
