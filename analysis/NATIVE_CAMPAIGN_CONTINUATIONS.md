@@ -1,5 +1,7 @@
 # Campaign continuation and insertion fixes
 
+Current: the target-retention and subsequent differences are resolved; full14014-frame battle, sound and browser painter gates pass. See [ARCHERS_MARK_COMPLETE_BATTLE.md](ARCHERS_MARK_COMPLETE_BATTLE.md). The prefix investigation below is historical.
+
 2026-11-16 follow-up to ARCHERS_MARK_RUNTIME.md. This is progress toward native first-three-stage fidelity, not completion of the overall video/3-2 goal.
 
 The previous turn implemented archer C but the ordinary campaign comparison stopped at1715. The same legal-input differential harness was rerun before editing and reproduced that failure. Four production differences have now been corrected from original bytecode/function execution:

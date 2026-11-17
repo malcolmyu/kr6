@@ -5,7 +5,7 @@ import {recordEnemyDamage} from './EnemyDeath.ts'
 import {EnemyMelee} from './EnemyMelee.ts'
 import {DodgeSystem} from './DodgeSystem.ts'
 import type {DodgeState} from './DodgeSystem'
-import {damageSoldier,soldierDamageFactor} from './SoldierHealth.ts'
+import {damageSoldier,soldierDamageFactor,soldierIsDead} from './SoldierHealth.ts'
 import type {SoldierBuff} from './SoldierHealth'
 import {predictDamage} from './Damage.ts'
 import type {EnemyInstance} from './GameSession'
@@ -23,7 +23,7 @@ export interface MeleeAttack {
   vis_flags:number;vis_bans:number;reduce_armor?:number;reduce_magic_armor?:number
   xp_gain_factor?:number;chance?:number;critical_chance?:number;pop?:string[];pop_chance?:number;pop_conds?:number;dodge_time?:number
   ignore_rally_change?:boolean;ts?:number;sound_hit?:string;ignore_stun?:boolean;hit_fx?:string;hit_fx_once?:boolean;hit_offset?:Point
-  disabled?:boolean;basic_attack?:boolean;type?:string;hit_damage_factor?:number[]
+  mod?:string;level?:number;disabled?:boolean;basic_attack?:boolean;type?:string;hit_damage_factor?:number[]
 }
 export interface SoldierTemplate {
   level?:number
@@ -52,8 +52,8 @@ export interface SoldierInstance {
   id:number;siteId:string;slot:number;name:string;template:SoldierTemplate
   pos:Point;rally:Point;center:Point;hp:number;born:number;diedAt?:number;target?:EnemyInstance;retainedTarget?:EnemyInstance
   motionDest?:Point;motionArrived?:boolean;facingLeft:boolean;moving:boolean;attack?:MeleeCycle;readyAt:number;lastHitAt:number;regenCounter:number;deployUntil:number;deploying:boolean
-  nativeHeroLife?:boolean;deathContinuation?:boolean;deathFinishedAt?:number;lifeCanClick?:boolean;
-  nativeReinforcement?:boolean;expiresAt?:number;fadeOutAt?:number;reinforcementFadeTo?:Point;prefix?:string
+  powerLevels?:Record<string,number>;powerChanges?:Set<string>;nativeHeroLife?:boolean;deathContinuation?:boolean;deathFinishedAt?:number;lifeCanClick?:boolean;
+  hpBeforeTimeout?:number;nativeReinforcement?:boolean;expiresAt?:number;fadeOutAt?:number;reinforcementFadeTo?:Point;prefix?:string
   dodge?:DodgeState
   modifierTypes?:Set<string>
   buffs?:Map<string,SoldierBuff>
@@ -105,6 +105,12 @@ export class BarracksCombat {
     if(s.pos.x===s.rally.x&&s.pos.y===s.rally.y){this.finishHeroRally(s);s.deploying=false;s.moving=false;s.idleVisual={name:'idle',at:s.idleVisual?.at??s.meleeVisual?.at??s.born,loop:true};return false}
     this.move(s,s.rally,dt);s.moving=true;return true
   }
+  /** A resumed native pre-hit wait tests its time condition before health.dead. */
+  resumeHeroMeleeDeath(s:SoldierInstance,time:number){
+    const cycle=s.attack,times=cycle?.attack.hit_times??[cycle?.attack.hit_time??0]
+    if(cycle&&s.target&&cycle.nextHit<times.length&&time-cycle.startedAt>=times[cycle.nextHit])this.soldierAttack(s,s.target,time)
+    this.interruptHeroMelee(s)
+  }
   interruptHeroMelee(s:SoldierInstance){const c=this.criticalAttacks.get(s.id);if(c){s.template.unit!.damage_factor=(s.template.unit!.damage_factor??1)/2;c.cycle.critical=false;this.criticalAttacks.delete(s.id)}s.attack=undefined}
   deferReinforcements=false
   deferHeroes=false
@@ -116,6 +122,8 @@ export class BarracksCombat {
   onReinforcementSpawn:()=>void=()=>{}
   onCreate:(soldier:SoldierInstance)=>void=()=>{}
   onRemove:(soldier:SoldierInstance)=>void=()=>{}
+  nativeSpecialAuras=false
+  onSpecialFirstMain:(s:SoldierInstance,time:number)=>void=()=>{}
   readonly reinforcementAura=new ReinforcementAura()
   onEffect:(name:string,pos:Point,time:number)=>void=()=>{}
   private pendingSpecialAuras:{soldier:SoldierInstance;at:number}[]=[]
@@ -124,6 +132,11 @@ export class BarracksCombat {
   readonly dodges:DodgeSystem
   readonly soldiers:SoldierInstance[]=[]
   readonly doors=new Map<string,DoorState>()
+  onKnightCastMain:(s:SoldierInstance,time:number)=>boolean=()=>false
+  onKnightInCooldown:(s:SoldierInstance,time:number)=>void=()=>{}
+  onKnightMeleeModifier:(name:string,target:EnemyInstance,source:SoldierInstance,level:number,time:number)=>void=()=>{}
+  onKnightTowerLoop:(site:TowerSite)=>void=()=>{}
+  onKnightSkillMain:(s:SoldierInstance,outer:boolean)=>void=()=>{}
   onSound:(name:string)=>void=()=>{}
   onStopSound:(name:string)=>void=()=>{}
   private knightDeployments=new WeakMap<SoldierInstance,{phase:'wait'|'walk';startedAt:number;duration:number;previousBans:number;previousImmunity:number}>()
@@ -169,7 +182,8 @@ export class BarracksCombat {
   }
   initializeReinforcementInsert(s:SoldierInstance){
     if(!s.name.startsWith('soldier_reinforcement'))return
-    if(s.name==='soldier_reinforcement_base'){s.nativeReinforcement=true;s.corpseAlpha=0}
+    if(s.name==='soldier_reinforcement_base'||this.nativeSpecialAuras&&s.name==='soldier_reinforcement_special')s.nativeReinforcement=true
+    if(s.name==='soldier_reinforcement_base')s.corpseAlpha=0
     const info=s.template.info;if(!info?.random_name_format)return
     const variant=Number(s.prefix?.at(-1)),female=s.name==='soldier_reinforcement_base'&&((s.template.level===1&&variant===1)||((s.template.level===2||s.template.level===3)&&variant===2))
     const format=female?'SOLDIER_REINFORCEMENTS_F_%i_NAME':info.random_name_format,count=female?4:info.random_name_count
@@ -177,9 +191,9 @@ export class BarracksCombat {
   }
   reinforce(pos:Point,time:number) {
     for(const member of reinforcementSquad(pos,!!this.templates.power_reinforcements_control?.upgrade_special_unit)) {
-      const {name,slot}=member,template=this.templates[name],special=name==='soldier_reinforcement_special',variant=special?undefined:1+Math.floor(this.random()*3),rally=member.pos
+      const {name,slot}=member,template=structuredClone(this.templates[name]),special=name==='soldier_reinforcement_special',variant=special?undefined:1+Math.floor(this.random()*3),rally=member.pos
       const soldier:SoldierInstance={id:this.nextId++,siteId:`reinforcement-${time}`,slot,name,template,dodge:template.dodge?structuredClone(template.dodge):undefined,pos:{...rally},rally,center:{...pos},hp:template.health.hp_max,born:time,facingLeft:false,moving:false,readyAt:time,lastHitAt:template.regen.last_hit_ts??0,regenCounter:template.regen.ts_counter??0,deployUntil:time+10/30,deploying:!special,expiresAt:time+template.reinforcement!.duration,prefix:template.render.sprites[0].prefix+(variant??'')}
-      if(special){soldier.reinforcementInAt=time;soldier.healthBarHidden=true;soldier.visualOverride={name:'in',at:time};this.pendingSpecialAuras.push({soldier,at:time+2/30})}
+      if(special){soldier.reinforcementInAt=time;soldier.healthBarHidden=true;soldier.visualOverride={name:'in',at:time};if(!this.nativeSpecialAuras)this.pendingSpecialAuras.push({soldier,at:time+2/30})}
       this.soldiers.push(soldier)
       this.onCreate(soldier)
       if(template.sound_events?.insert)this.onSound(template.sound_events.insert)
@@ -210,9 +224,9 @@ export class BarracksCombat {
   upgradeNativeSite(site:TowerSite,time:number){
     const barrack=this.templates[site.tower!]?.barrack;if(!barrack)return
     this.doors.delete(site.id)
-    for(const old of this.soldiers.filter(s=>s.siteId===site.id&&s.hp>0).sort((a,b)=>a.slot-b.slot)){
+    for(const old of this.soldiers.filter(s=>s.siteId===site.id&&!soldierIsDead(s)).sort((a,b)=>a.slot-b.slot)){
       if(old.slot>barrack.max_soldiers){this.releaseKnight(old);this.onRemove(old);continue}
-      const name=barrack.soldier_type,template=structuredClone(this.templates[name]),next:SoldierInstance={...old,id:this.nextId++,name,template,dodge:template.dodge?structuredClone(template.dodge):undefined,hp:template.health.hp_max,born:time+1/30,pos:{...old.pos},rally:{...old.rally},center:{...old.center},buffs:undefined,attack:undefined,visualOverride:undefined,upgradedPose:old.visualOverride?{...old.visualOverride}:undefined,lastHitAt:template.regen.last_hit_ts??0,regenCounter:template.regen.ts_counter??0,removalQueuedAt:undefined}
+      const name=barrack.soldier_type,template=structuredClone(this.templates[name]),next:SoldierInstance={...old,id:this.nextId++,name,template,dodge:template.dodge?structuredClone(template.dodge):undefined,hp:template.health.hp_max,born:time+1/30,pos:{...old.pos},rally:{...old.rally},center:{...old.center},buffs:undefined,powerLevels:{...site.powerLevels},powerChanges:undefined,attack:undefined,visualOverride:undefined,upgradedPose:old.visualOverride?{...old.visualOverride}:undefined,lastHitAt:template.regen.last_hit_ts??0,regenCounter:template.regen.ts_counter??0,removalQueuedAt:undefined}
       const state=this.knightStates.get(old);this.knightStates.set(next,{attackTs:state?.attackTs??0,waiting:false})
       const target=old.target;if(target){const order=this.blockerOrder.get(target),index=order?.indexOf(old)??-1;if(index>=0)order![index]=next;old.target=undefined}
       this.soldiers.push(next);this.onCreate(next);this.onRemove(old)
@@ -225,7 +239,7 @@ export class BarracksCombat {
     for(let i=this.soldiers.length-1;i>=0;i--) {
       const s=this.soldiers[i]
       if(s.siteId!==site.id)continue
-      if(s.hp<=0){this.soldiers.splice(i,1);continue}
+      if(soldierIsDead(s)){this.soldiers.splice(i,1);continue}
       // Native tower_upgrade creates a new entity. Modifiers and projectiles
       // holding the old soldier must not silently retarget the replacement.
       const template=this.templates[barrack.soldier_type]
@@ -241,10 +255,10 @@ export class BarracksCombat {
   advance(time:number,dt:number,sites:TowerSite[],enemies:EnemyInstance[]) {
     this.advanceCriticals(time)
     for(let index=this.pendingSpecialAuras.length-1;index>=0;index--){const p=this.pendingSpecialAuras[index];if(time<p.at)continue;this.pendingSpecialAuras.splice(index,1);if(this.soldiers.includes(p.soldier)){this.reinforcementAura.start(p.soldier,time,(this.templates.aura_power_reinforcement_special as unknown as {aura?:{duration:number}})?.aura?.duration);this.onEffect('decal_power_reinforcements_special',p.soldier.pos,time)}}
-    this.reinforcementAura.advance(time,this.soldiers)
+    if(!this.nativeSpecialAuras)this.reinforcementAura.advance(time,this.soldiers)
     for(let i=this.soldiers.length-1;i>=0;i--) {
       const s=this.soldiers[i]
-      if(s.fadeOutAt!==undefined && !s.reinforcementFadeTo && time-s.fadeOutAt>50/s.template.motion.max_speed){this.soldiers.splice(i,1);continue}
+      if(s.fadeOutAt!==undefined && !s.nativeReinforcement && !s.reinforcementFadeTo && time-s.fadeOutAt>50/s.template.motion.max_speed){this.soldiers.splice(i,1);continue}
       if(s.name.startsWith('soldier_knights_lvl')||s.nativeReinforcement){
         if(s.removalQueuedAt!==undefined&&time>s.removalQueuedAt)this.soldiers.splice(i,1)
       }else if(!s.hero && !s.reinforcementFadeTo && s.diedAt!==undefined && time-s.diedAt>s.template.health.dead_lifetime)this.soldiers.splice(i,1)
@@ -264,6 +278,7 @@ export class BarracksCombat {
       if(!b)return
       const missing=Array.from({length:b.max_soldiers},(_,i)=>i+1).filter(slot=>!this.soldiers.some(s=>s.siteId===site.id && s.slot===slot))
       let door=this.doors.get(site.id)
+      if(!(door?.animation==='close'&&!door.closed)&&!(door?.animation==='open'&&door.spawnAt!==undefined))this.onKnightTowerLoop(site)
       if(door?.animation==='close'&&!door.closed){
         if(nativeLogicAnimationFrame(8,time,door.startedAt,false,30).runs>0){door.closed=true;this.flushRallySound(site)}
         // Completing the close coroutine still reaches the outer yield.
@@ -278,10 +293,10 @@ export class BarracksCombat {
         }
         if(door.spawnAt===undefined || nativeLogicAnimationFrame(Math.round((door.spawnAt-door.startedAt)*30),time,door.startedAt,false,30).runs>0) {
           for(const slot of missing) {
-            const template=this.templates[b.soldier_type]
+            const template=structuredClone(this.templates[b.soldier_type])
             const rally=rallyFormation(slot,b.max_soldiers,site.rally,b.rally_radius,b.rally_angle_offset)
             const delay=b.soldier_type.startsWith('soldier_knights_lvl')?0:template.nav_rally.delay_min+this.random()*(template.nav_rally.delay_max-template.nav_rally.delay_min)
-            this.soldiers.push({id:this.nextId++,siteId:site.id,slot,name:b.soldier_type,template,dodge:template.dodge?structuredClone(template.dodge):undefined,pos:{x:site.pos.x+b.respawn_offset.x,y:site.pos.y+b.respawn_offset.y},rally,center:{...site.rally},hp:template.health.hp_max,born:time,facingLeft:false,moving:false,readyAt:time,lastHitAt:template.regen.last_hit_ts??0,regenCounter:template.regen.ts_counter??0,deployUntil:time+delay,deploying:true,firstRally:true,rallyCount:b.max_soldiers,mainStartTick:Math.round(time*30)+1,visBans:4294967295,rallyImmunity:template.nav_rally.immune_to??0})
+            this.soldiers.push({id:this.nextId++,siteId:site.id,slot,name:b.soldier_type,template,dodge:template.dodge?structuredClone(template.dodge):undefined,pos:{x:site.pos.x+b.respawn_offset.x,y:site.pos.y+b.respawn_offset.y},rally,center:{...site.rally},hp:template.health.hp_max,born:time,facingLeft:false,moving:false,readyAt:time,lastHitAt:template.regen.last_hit_ts??0,regenCounter:template.regen.ts_counter??0,deployUntil:time+delay,deploying:true,firstRally:true,rallyCount:b.max_soldiers,mainStartTick:Math.round(time*30)+1,visBans:4294967295,rallyImmunity:template.nav_rally.immune_to??0,powerLevels:{...site.powerLevels}})
             this.onCreate(this.soldiers.at(-1)!)
           }
           if(door.spawnAt!==undefined){door.openedAt=time;door.closeAt=time+b.door_hold_time;door.spawnAt=undefined}
@@ -294,15 +309,18 @@ export class BarracksCombat {
   }
   private pendingRallySounds=new Set<string>()
   private flushRallySound(site:TowerSite){
-    if(!this.pendingRallySounds.delete(site.id)||!this.soldiers.some(s=>s.siteId===site.id&&s.hp>0))return
+    if(!this.pendingRallySounds.delete(site.id)||!this.soldiers.some(s=>s.siteId===site.id&&!soldierIsDead(s)))return
     const sound=this.templates[site.tower!]?.sound_events?.change_rally_point;if(sound)this.onSound(sound)
   }
   advanceKnightMain(s:SoldierInstance,time:number,dt:number,sites:TowerSite[],enemies:EnemyInstance[]){
     if(!this.soldiers.includes(s))return
     s.towerDamageFactor=sites.find(site=>site.id===s.siteId)?.damageFactor??1;s.moving=false
-    if(s.hp<=0){this.advanceKnightDeath(s,time);return}
+    if(this.onKnightCastMain(s,time))return
+    if(s.mainStarted||s.mainStartTick===undefined||Math.round(time*30)>=s.mainStartTick)this.onKnightSkillMain(s,!this.knightDeployments.has(s)&&!(this.knightStates.get(s)?.waiting&&s.attack))
+    if(soldierIsDead(s)){this.advanceKnightDeath(s,time);return}
     if(s.scriptLocked||time+1e-9<(s.actionYieldUntil??0))return
         if(s.mainStartTick!==undefined&&!s.mainStarted){if(Math.round(time*30)<s.mainStartTick)return;s.mainStarted=true;s.born=time;s.visBans=s.template.vis?.bans??0;s.rallyImmunity=0}
+        if(s.template.unit?.is_stunned){this.advanceIdle(s,time,dt);return}
         if(s.deploying&&this.advanceKnightRally(s,time,dt,enemies))return
         this.advanceKnight(s,time,dt,enemies);
   }
@@ -311,16 +329,16 @@ export class BarracksCombat {
     else if(s.deploying)s.corpseAlpha=255*Math.min(1,Math.max(0,time-s.born)/(10/30))
   }
   advanceReinforcementMain(s:SoldierInstance,time:number,dt:number,sites:TowerSite[],enemies:EnemyInstance[]){
-    if(!s.mainStarted){s.mainStarted=true;this.onReinforcementSpawn()}
+    if(!s.mainStarted){if(this.nativeSpecialAuras&&s.name==='soldier_reinforcement_special')this.onSpecialFirstMain(s,time);s.mainStarted=true;this.onReinforcementSpawn()}
     if(s.name!=='soldier_reinforcement_base'){this.advanceSoldierMain(s,time,dt,sites,enemies);return}
     s.moving=false
     if(s.scriptLocked)return
     if(s.reinforcementFadeTo){this.move(s,s.reinforcementFadeTo,dt);return}
     if(this.knightStates.get(s)?.waiting&&s.attack){this.advanceKnight(s,time,dt,enemies);return}
-    if(s.hp<=0){this.advanceKnightDeath(s,time);return}
+    if(soldierIsDead(s)){this.advanceKnightDeath(s,time);return}
     if(s.expiresAt!==undefined&&time>s.expiresAt){
       this.onRemoveModifiers(s)
-      s.fadeOutAt=s.diedAt=s.deathHealthAt=time;s.hp=0;s.reinforcementFadeTo={x:s.pos.x+(s.facingLeft?-50:50),y:s.pos.y};this.releaseKnight(s)
+      s.healthBarHidden=true;s.fadeOutAt=s.diedAt=s.deathHealthAt=time;s.hpBeforeTimeout=s.hp;s.hp=0;s.reinforcementFadeTo={x:s.pos.x+(s.facingLeft?-50:50),y:s.pos.y};this.releaseKnight(s)
       s.visualOverride={name:'walk',at:time,loop:true};this.move(s,s.reinforcementFadeTo,dt);return
     }
     if(s.deploying){if(time-s.born<10/30)return;s.deploying=false}
@@ -335,18 +353,25 @@ export class BarracksCombat {
   advanceSoldierMain(s:SoldierInstance,time:number,dt:number,sites:TowerSite[],enemies:EnemyInstance[]){
       s.towerDamageFactor=sites.find(site=>site.id===s.siteId)?.damageFactor??1
       s.moving=false;s.idleRequestedAt=undefined
+      // The original entrance coroutine owns main even after lethal damage.
+      if(this.nativeSpecialAuras&&s.name==='soldier_reinforcement_special'&&s.reinforcementInAt!==undefined){
+        if(nativeLogicAnimationFrame(reinforcementFrames(s.prefix??s.template.render.sprites[0].prefix,'in')??1,time,s.reinforcementInAt,false,30).runs===0)return
+        s.reinforcementInAt=undefined
+        if(s.hp>0)s.healthBarHidden=false
+      }
+      if(this.nativeSpecialAuras&&s.name==='soldier_reinforcement_special'&&s.specialAttack){this.advanceSpecialAttack(s,time);return}
       if(s.hero&&!s.attack){if(s.meleeVisual)s.idleVisual={...s.meleeVisual,loop:false};s.meleeVisual=undefined}
-      if(s.hp>0 && s.expiresAt!==undefined && time>s.expiresAt){s.hp=0;s.fadeOutAt=time;s.target=undefined;s.attack=undefined;s.visualOverride=undefined;s.specialAttack=undefined}
-      if(s.fadeOutAt!==undefined){s.pos.x+=(s.facingLeft?-1:1)*s.template.motion.max_speed*dt;s.moving=true;return}
+      if(s.hp>0 && s.expiresAt!==undefined && time>s.expiresAt){if(this.nativeSpecialAuras)this.onRemoveModifiers(s);s.hpBeforeTimeout=s.hp;s.hp=0;s.fadeOutAt=time;if(this.nativeSpecialAuras)s.healthBarHidden=true;if(this.nativeSpecialAuras){s.deathHealthAt=time;s.reinforcementFadeTo={x:s.pos.x+(s.facingLeft?-50:50),y:s.pos.y};this.releaseKnight(s)};s.target=undefined;s.attack=undefined;s.visualOverride=undefined;s.specialAttack=undefined}
+      if(s.fadeOutAt!==undefined){if(this.nativeSpecialAuras&&s.reinforcementFadeTo){this.move(s,s.reinforcementFadeTo,dt);s.visualOverride={name:'walk',at:s.fadeOutAt,loop:true};return}s.pos.x+=(s.facingLeft?-1:1)*s.template.motion.max_speed*dt;s.moving=true;return}
       if(s.hp<=0){
         this.finishHeroRally(s)
         if(s.name.startsWith('soldier_knights_lvl'))this.advanceKnightDeath(s,time)
-        if(s.name==='soldier_reinforcement_special'){s.visualOverride=undefined;s.specialAttack=undefined;s.reinforcementInAt=undefined}
+        if(s.name==='soldier_reinforcement_special'){if(this.nativeSpecialAuras)this.advanceKnightDeath(s,time);else s.visualOverride=undefined;s.specialAttack=undefined;s.reinforcementInAt=undefined}
         return
       }
-      if(s.reinforcementInAt!==undefined){if(!reinforcementAnimationFinished('in',time-s.reinforcementInAt))return;s.reinforcementInAt=undefined;s.healthBarHidden=false;s.visualOverride=undefined}
+      if(s.reinforcementInAt!==undefined){const finished=this.nativeSpecialAuras?nativeLogicAnimationFrame(reinforcementFrames(s.prefix??s.template.render.sprites[0].prefix,'in')??1,time,s.reinforcementInAt,false,30).runs>0:reinforcementAnimationFinished('in',time-s.reinforcementInAt);if(!finished)return;s.reinforcementInAt=undefined;s.healthBarHidden=false;s.visualOverride=undefined}
       if(s.specialAttack){this.advanceSpecialAttack(s,time);return}
-      if(s.name==='soldier_reinforcement_special')s.visualOverride=undefined
+      if(s.name==='soldier_reinforcement_special'&&!this.nativeSpecialAuras)s.visualOverride=undefined
       if(s.scriptLocked||time+1e-9<(s.actionYieldUntil??0))return
       if(s.rangedUntil!==undefined && time<s.rangedUntil)return
       if(s.deploying) {
@@ -367,7 +392,14 @@ export class BarracksCombat {
         const slot=this.blockers(target).indexOf(s)+1,spread=s.template.soldier.melee_slot_spread??{x:-3,y:-6}
         const offset=s.template.soldier.melee_slot_offset,enemyOffset=target.template.enemy.melee_slot??{x:30,y:0}
         const goal=meleeSlot(slot,target.path.position,Math.atan2(target.path.direction.y,target.path.direction.x),enemyOffset,offset,spread)
-        if(s.pos.x!==goal.x||s.pos.y!==goal.y) {const moving=this.move(s,goal,dt);if(!moving){s.facingLeft=target.path.position.x<s.pos.x;s.idleVisual={name:s.template.melee.arrived_slot_animation??'idle',at:s.idleVisual?.at??s.born,loop:true}}s.attack=undefined;return}
+        if(s.pos.x!==goal.x||s.pos.y!==goal.y) {
+          const nativeSpecial=this.nativeSpecialAuras&&s.name==='soldier_reinforcement_special'
+          // animation_start(loop=true) preserves the preceding sprite timestamp.
+          if(nativeSpecial)s.visualOverride={name:'walk',at:s.visualOverride?.at??s.born,loop:true}
+          const moving=this.move(s,goal,dt)
+          if(!moving){s.facingLeft=target.path.position.x<s.pos.x;s.idleVisual={name:s.template.melee.arrived_slot_animation??'idle',at:s.idleVisual?.at??s.born,loop:true};if(nativeSpecial)s.visualOverride={...s.idleVisual,at:s.visualOverride!.at}}
+          s.attack=undefined;return
+        }
         // Original soldier_move_to_slot_step sets arrived even when an earlier
         // continuation already placed the unit exactly at this new slot.
         s.motionArrived=true;s.facingLeft=target.path.position.x<s.pos.x
@@ -375,7 +407,7 @@ export class BarracksCombat {
       } else {
         s.attack=undefined
         this.move(s,s.rally,dt)
-        if(s.moving)s.facingLeft=s.rally.x<s.pos.x
+        if(s.moving){s.facingLeft=s.rally.x<s.pos.x;if(this.nativeSpecialAuras&&s.name==='soldier_reinforcement_special')s.visualOverride={name:'walk',at:s.visualOverride?.at??s.born,loop:true}}
         if(!s.moving){if(s.hero)s.idleRequestedAt=time;else this.advanceIdle(s,time,dt)}
         if(!s.moving && !(s.hero&&this.deferHeroes) && time-s.lastHitAt>s.template.regen.last_hit_standoff_time) {
           s.regenCounter+=dt
@@ -458,7 +490,7 @@ export class BarracksCombat {
     for(const e of enemies)e.blocked=e.hp>0 && this.blockers(e).length>0
   }
   blockers(e:EnemyInstance) {
-    const live=this.soldiers.filter(s=>(s.hp>0||s.holdsBlockWhileDead) && s.target===e)
+    const live=this.soldiers.filter(s=>(!soldierIsDead(s)||s.holdsBlockWhileDead) && s.target===e)
     const order=this.blockerOrder.get(e)??[]
     for(let i=order.length-1;i>=0;i--)if(!live.includes(order[i]))order.splice(i,1)
     for(const s of live)if(!order.includes(s))order.push(s)
@@ -485,6 +517,8 @@ export class BarracksCombat {
     if(state?.waiting&&s.attack){this.advanceKnightAttack(s,state,time);return}
     if(s.diedAt!==undefined){
       const duration=s.template.unit?.fade_duration_after_death??2
+      const deathFrames=((soldierFrames as unknown as Record<string,Record<string,number>>)[s.template.render.sprites[0].prefix]?.death??reinforcementFrames(s.prefix??s.template.render.sprites[0].prefix,'death')??1)
+      if(nativeLogicAnimationFrame(deathFrames,time,s.diedAt,false,30).runs>0)s.deathFinishedAt??=time
       if(!s.corpseFade&&s.template.unit?.fade_time_after_death!==undefined&&nativeLogicAnimationFrame(((soldierFrames as unknown as Record<string,Record<string,number>>)[s.template.render.sprites[0].prefix]?.death??reinforcementFrames(s.prefix??s.template.render.sprites[0].prefix,'death')??1),time,s.diedAt,false,30).runs>0){
         const delay=s.deathHealthAt+s.template.health.dead_lifetime-time-duration
         s.corpseFade={at:time,delay,duration}
@@ -556,8 +590,8 @@ export class BarracksCombat {
     }
     s.motionArrived=true
     const a=s.template.melee.attacks.find(a=>!a.disabled&&a.type!=='area')
-    if(!a||!(a.cooldown<time-state.attackTs)||(a.vis_flags&target.template.vis.bans)||(a.vis_bans&target.template.vis.flags))return
-    if((a.chance??1)<=this.random()){state.attackTs=time;return}
+    if(!a||!(a.cooldown<time-state.attackTs)||(a.vis_flags&target.template.vis.bans)||(a.vis_bans&target.template.vis.flags)){this.onKnightInCooldown(s,time);return}
+    if((a.chance??1)<=this.random()){state.attackTs=time;this.onKnightInCooldown(s,time);return}
     const factor=s.name.startsWith('soldier_knights_lvl')?(s.towerDamageFactor??1):1,scaled={...a,damage_min:a.damage_min*factor,damage_max:a.damage_max*factor}
     s.attack={startedAt:time,nextHit:0,attack:scaled,targetId:target.id};state.waiting=true
     s.visualOverride={name:a.animation,at:time,loop:false};s.facingLeft=target.path.position.x<s.pos.x
@@ -576,6 +610,7 @@ export class BarracksCombat {
       if(!this.dodges.checkEnemy(e,time,true,a)&&this.blockers(e).includes(s)){
         const packet=this.damage(a,soldierDamageFactor(s))
         const order=this.onDamageCreate();this.knightDamage.push({soldier:s,enemy:e,attack:a,packet,popOrder:typeof order==='number'?order:undefined})
+        if(a.mod)this.onKnightMeleeModifier(a.mod,e,s,a.level??0,time)
         if(a.hit_fx){const o=a.hit_offset??{x:0,y:0},pos={x:s.pos.x+(s.facingLeft?-1:1)*o.x,y:s.pos.y+o.y};this.onEffectCreate(a.hit_fx,pos,time);this.onEffect(a.hit_fx,pos,time)}
       }
     }
@@ -603,7 +638,7 @@ export class BarracksCombat {
   private soldierAttack(s:SoldierInstance,e:EnemyInstance,time:number) {
     if(s.name==='soldier_reinforcement_special'){
       if(time<s.readyAt)return
-      const attack=s.template.melee.attacks[0];s.specialAttack=new SpecialReinforcementAttack(time);s.specialTarget=e;s.attack={startedAt:time,nextHit:0,attack,targetId:e.id};s.readyAt=time+attack.cooldown
+      const attack=s.template.melee.attacks[0];if(this.nativeSpecialAuras&&(attack.chance??1)<=this.random()){s.readyAt=time+attack.cooldown;return}s.specialAttack=new SpecialReinforcementAttack(time,this.nativeSpecialAuras);s.specialTarget=e;s.attack={startedAt:time,nextHit:0,attack,targetId:e.id};s.readyAt=time+attack.cooldown
       if(attack.sound)this.onSound(attack.sound);this.advanceSpecialAttack(s,time);return
     }
     const lastMelee=this.genericMeleeClocks.get(s),cooldown=s.template.melee.attacks[0]?.cooldown??0
@@ -649,6 +684,13 @@ export class BarracksCombat {
     if(target.hp>0)target.blocked=true
     const hit=state.advance(time,{dead:s.hp<=0,stunned:s.template.unit?.is_stunned})
     s.visualOverride={name:state.name,at:state.at}
+    if(this.nativeSpecialAuras&&hit){
+      if(!this.dodges.checkEnemy(target,time,true,a)&&this.blockers(target).includes(s)){
+        const packet=this.damage(a,soldierDamageFactor(s)),order=this.onDamageCreate()
+        this.knightDamage.push({soldier:s,enemy:target,attack:a,packet,popOrder:typeof order==='number'?order:undefined})
+        if(a.hit_fx){const o=a.hit_offset??{x:0,y:0},pos={x:s.pos.x+(s.facingLeft?-1:1)*o.x,y:s.pos.y+o.y};this.onEffectCreate(a.hit_fx,pos,time);this.onEffect(a.hit_fx,pos,time)}
+      }
+    }else
     if(hit&&s.target===target&&target.hp>0&&!target.template.health.ignore_damage&&!(target.smokeDodgeUntil!==undefined&&time<=target.smokeDodgeUntil&&!target.template.unit.is_stunned)){
       recordEnemyDamage(target,a.damage_type,time)
       const damage=predictDamage({...target.template.health,hp:target.hp},this.damage(a,(s.towerDamageFactor??1)*soldierDamageFactor(s)))

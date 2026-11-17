@@ -1,8 +1,22 @@
 # 王国保卫战 6 还原工程
 
+高级援军的真实入场/光环/护甲及伤害修饰器已接入原版实体阶段，补齐入场阵亡、连续召唤刷新、三段攻击、退场与护甲光效；同时将血条淡入淡出移到固定模拟帧，并还原烟雾清零透明度和漏怪删除边界。63882条整场原版血条记录通过，原有3-2胜利浏览器回归也通过。详见 [REINFORCEMENT_SPECIAL_NATIVE_GAP.md](analysis/REINFORCEMENT_SPECIAL_NATIVE_GAP.md)。整体六流程、视频和听感验收仍未完成。
+
+骑士塔「继承遗志」的阵亡检测、八秒强化攻击与概率眩晕已接入正常三级购买。12组核心原版控制器及576组眩晕用例通过；一条普通战役整场12623帧、1989次有效音效请求和Chrome全部641个绘制检查点匹配原版并自然败北。高级援军旧实体缺口已修正，扩展后的16组控制器用例及真实图集光效浏览器检查通过；普通高级援军战役已匹配原版整场13037帧、2246次有效音效请求、1886个Chrome绘制检查点与257410个提交帧，策略自然败北；见 [KNIGHT_LEGACY_NATIVE_RUNTIME.md](analysis/KNIGHT_LEGACY_NATIVE_RUNTIME.md) 和 [REINFORCEMENT_SPECIAL_NATIVE_GAP.md](analysis/REINFORCEMENT_SPECIAL_NATIVE_GAP.md)。
+
+骑士塔「战斗坚韧」已接入三级购买、分段回血、原版动作与音效，并还原改集结点/眩晕/阵亡时的协程中断。14组受控原版对照及普通战役整场12886帧、1947次有效音效请求、Chrome全部508个绘制检查点通过；该策略自然败北，完整视频与其余高级技能仍待完成。见 [KNIGHT_HEAL_NATIVE_RUNTIME.md](analysis/KNIGHT_HEAL_NATIVE_RUNTIME.md)。
+
+骑士塔「守护鼓舞」已接入正常三级购买、永久护甲、英雄邻近护甲与两层原版淡入淡出光效；八组原版控制器对照覆盖技能等级、购买时序、卖塔清理和阵亡补员，浏览器正常菜单验证通过。普通波次路线已匹配原版全部12873帧逻辑和2087次有效音效请求，Chrome全部555个绘制检查点及结算窗口也通过；该策略自然败北，完整视频验收仍待完成，见 [KNIGHT_ARMOR_NATIVE_RUNTIME.md](analysis/KNIGHT_ARMOR_NATIVE_RUNTIME.md)。
+
 当前阶段总览与验收边界见 [MILESTONES.md](MILESTONES.md)（2026-11-16，整体估算约80%，非完整验收）。
 
-弓箭塔“揭示弱点”已开放三档购买，施放、标记增伤、原版骨骼/音效与消退清理已接入正式实体队列。独立原版对照、正常菜单浏览器与既有3-2通关回归通过；普通战役对照已推进到11693帧，含440帧实际标记状态；完整战斗仍有目标保留差异未解决，见 [ARCHERS_MARK_RUNTIME.md](analysis/ARCHERS_MARK_RUNTIME.md)。全目标仍未完成。
+弓箭塔“揭示弱点”已完成一条普通第三关战役整场原版对照：14014帧、15204个实体事件、1568次音效请求，以及Chrome全部1287个绘制检查点通过。该策略自然失败，不能替代通关或完整视频验收；详见 [ARCHERS_MARK_COMPLETE_BATTLE.md](analysis/ARCHERS_MARK_COMPLETE_BATTLE.md)。全目标仍未完成。
+
+弓箭塔“肌腱穿刺”已开放三档150金币购买，正常菜单、射线、眩晕、音效和卖塔存续检查通过；一条普通第三关战役完整匹配13401帧、14841个实体事件、1489次具名音效请求，Chrome935个绘制检查点/84048个提交帧通过。策略自然失败，完整视频与A/B/C组合仍待验收，见 [ARCHERS_PIERCE_PURCHASES_BATTLE.md](analysis/ARCHERS_PIERCE_PURCHASES_BATTLE.md)。
+
+弓塔 B“苍穹之眼”的鹰、范围增益和预览已接入正式实体、升级转移与原版绘制排序。十四组完整整链（含卖塔重建边界），以及普通战役14014帧/15145事件/1576音效请求和Chrome1786个绘制检查点通过；策略自然败北，见 [ARCHERS_RANGE_NATIVE_RUNTIME.md](analysis/ARCHERS_RANGE_NATIVE_RUNTIME.md)。完整视频与六流程验收仍未完成。
+
+法师塔“知识之卷”的增益、光效、地面标记与预览已接入正式实体队列；14组原版整链共15400帧、正常菜单购买与实际双倍伤害验证通过。同一普通战役现完整匹配20931帧/31754事件/2483次音效请求，并以4生命、1星自然胜利；Chrome1028个绘制检查点/134569个原版提交帧和胜利界面通过，详见 [WIZARD_EMPOWER_COMPLETE_BATTLE.md](analysis/WIZARD_EMPOWER_COMPLETE_BATTLE.md)。完整视频与六流程仍未验收。
 
 最终交付：HTML 网页版，Vue + TypeScript + Three.js。
 

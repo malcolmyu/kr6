@@ -16,6 +16,7 @@ export class RoyalRuntime {
  onRemove:(model:RoyalModel)=>void=()=>{}
  findSites:(global:boolean)=>TowerSite[]=()=>[]
  findEnemies:(pos:Point,range:number,global:boolean)=>EnemyInstance[]=()=>[]
+ hasTower:(site:TowerSite)=>boolean=site=>!!site.tower
  siteId:(site:TowerSite)=>number|undefined=()=>undefined
  present:(enemy:EnemyInstance)=>boolean=()=>true
  private owner:RoyalEdictSystem
@@ -65,7 +66,7 @@ export class RoyalRuntime {
    model.poll=time
   }else if(model.kind==='buff'){
    if(model.pendingRemove)return
-   if(!model.site.tower){model.pendingRemove=true;this.onRemove(model);return}
+   if(!this.hasTower(model.site)){model.pendingRemove=true;this.onRemove(model);return}
    if(model.phase!=='start')model.appliedId=this.siteId(model.site)
    if(model.phase==='start'){
     if(!this.finished('mod_power_royal_edict_towerbuff','start',time,model.ts))return

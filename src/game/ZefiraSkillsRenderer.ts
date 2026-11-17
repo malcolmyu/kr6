@@ -1,3 +1,4 @@
+import {nativeAnimationFrame} from './NativeAnimation.ts'
 import {nativeSpriteOrder} from './NativePainterOrder.ts'
 import shieldData from '../../public/data/zefira-shield.json' with {type:'json'}
 import hammerData from '../../public/data/zefira-hammer.json' with {type:'json'}
@@ -50,13 +51,13 @@ export class ZefiraSkillsRenderer {
    particles.setOrder(...nativeSpriteOrder(configs[1],p,id,2))
   }
   const stunLive=new Set<string>()
-  const stuns=[...[...system.modifiers.stuns].map(([id,s])=>({key:String(id),enemy:s.enemy,at:s.animationAt??s.at,model:undefined})),...[...system.nativeHammer.stuns.values()].map(s=>({key:s.key,enemy:s.enemy,at:s.spriteTs,model:s}))]
+  const stuns=[...session.knightLegacy.stuns.stuns.map(s=>({key:`knight-legacy-${session.entities?.entity(s)?.id}`,enemy:s.enemy,at:s.spriteTs,model:s})),...session.archerPierceStun.stuns.map(s=>({key:`archer-pierce-${session.entities?.entity(s)?.id}`,enemy:s.enemy,at:s.spriteTs,model:s})),...[...system.modifiers.stuns].map(([id,s])=>({key:String(id),enemy:s.enemy,at:s.animationAt??s.at,model:undefined})),...[...system.nativeHammer.stuns.values()].map(s=>({key:s.key,enemy:s.enemy,at:s.spriteTs,model:s}))]
   for(const s of stuns){
    const e=s.enemy,key=s.key;if(e.teleportHidden)continue
    stunLive.add(key);let art=this.stunSprites.get(key)
    if(!art){art=this.atlas.create();this.scene.add(art.root);this.stunSprites.set(key,art)}
-   const model=s.model,pos=model?.pos??e.path.position,offset=e.template.unit.mod_offset??{x:0,y:0},name=`stun_${(e.template.unit.size??1)>1?'big':'small'}_loop`
-   art.root.position.set(pos.x+offset.x,pos.y+offset.y,2);if(model)art.setOrder(...nativeSpriteOrder(hammerData.mod_zefira_skill_a_stun.render.sprites[0],pos,session.entities?.entity(model)?.id??0));else art.setOrder(13020-pos.y);art.animate(this.animations[name],time-s.at,30,{x:.5,y:.5})
+   const model=s.model,pos=model?.pos??e.path.position,offset=model&&'offset'in model?model.offset:e.template.unit.mod_offset??{x:0,y:0},name=`stun_${(e.template.unit.size??1)>1?'big':'small'}_loop`
+   art.root.position.set(pos.x+offset.x,pos.y+offset.y,2);if(model)art.setOrder(...nativeSpriteOrder(hammerData.mod_zefira_skill_a_stun.render.sprites[0],pos,session.entities?.entity(model)?.id??0));else art.setOrder(13020-pos.y);if(model&&'offset'in model){const a=this.animations[name],frame=nativeAnimationFrame(a.to-a.from+1,time-s.at,true,30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,{x:.5,y:.5},model.flip)}else art.animate(this.animations[name],time-s.at,30,{x:.5,y:.5})
   }
   for(const [key,art]of this.exoSprites)if(!live.has(key)){art.dispose();this.exoSprites.delete(key)}
   for(const [key,art]of this.stunSprites)if(!stunLive.has(key)){art.dispose();this.stunSprites.delete(key)}

@@ -64,6 +64,7 @@ if variant=='zefira-first'then slot.heroes.team={'hero_zefira','hero_gerald'}els
 local runtimeProfile
 if arg[10]then
  local file=assert(io.open(arg[10]));runtimeProfile=assert(J.decode(file:read('*a')));file:close()
+ if runtimeProfile.towers then slot.towers.selected=table.deepclone(runtimeProfile.towers)end
  for kind,xp in pairs(runtimeProfile.powerXp or{})do assert(slot.powers.status[kind]);slot.powers.status[kind].xp=xp end
  for kind,nodes in pairs(runtimeProfile.powerUpgrades or{})do slot.upgrades_trees['power_'..kind]=nodes end
  for name,xp in pairs(runtimeProfile.heroXp or{})do assert(slot.heroes.status[name]);slot.heroes.status[name].xp=xp end

@@ -9,4 +9,4 @@ export function archerGeometry(site:Point,template:ArcherTemplate,sid:number,tar
  const offsets=template.attacks.list[0].bullet_start_offset,bullet=Array.isArray(offsets)?offsets[up?0:1]:offsets
  return {back,flipX,from:{x:site.x+offset.x+bullet.x*(flipX?-1:1),y:site.y+offset.y+bullet.y}}
 }
-export interface ArcherState {site:TowerSite;key:string;instance:number;createdAt:number;sid:number;shooterId:number;startedAt:number;back:boolean;flipX:boolean;pending:boolean;target?:EnemyInstance;targetId?:number;predPos:Point;initialized:boolean;idleTs:number;idleCooldown:number;phase:'idle'|'windup'|'animation';animation:'idle'|'shoot';loop:boolean;removed?:boolean}
+export interface ArcherState {site:TowerSite;key:string;instance:number;createdAt:number;sid:number;shooterId:number;startedAt:number;back:boolean;flipX:boolean;pending:boolean;target?:EnemyInstance;targetId?:number;predPos:Point;initialized:boolean;idleTs:number;idleCooldown:number;phase:'idle'|'windup'|'animation';animation:'idle'|'shoot'|'stun';windupAt?:number;bowPose?:{animation:'idle'|'shoot';back:boolean;flipX:boolean;startedAt:number;loop:boolean};loop:boolean;removed?:boolean}

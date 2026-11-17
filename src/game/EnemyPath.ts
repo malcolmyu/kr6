@@ -19,7 +19,7 @@ export class EnemyPath implements EnemyRoute {
   }
   headingToNextNode(speed:number){
     const lane=this.paths[this.pi-1][this.spi-1];let next=lane[this.ni]
-    if(next&&Math.hypot(next.x-this.position.x,next.y-this.position.y)<2*speed/30)next=lane[this.ni+1]??next
+    if(next&&Math.sqrt((next.x-this.position.x)**2+(next.y-this.position.y)**2)<2*speed/30)next=lane[this.ni+1]??next
     return next?Math.atan2(next.y-this.position.y,next.x-this.position.x):0
   }
   get remainingNodes():number {
@@ -38,7 +38,7 @@ export class EnemyPath implements EnemyRoute {
     if(this.finished || distance===0)return
     this.lastStep=distance
     let lane=this.paths[this.pi-1][this.spi-1],next=lane[this.ni]
-    if(!next || Math.hypot(next.x-this.position.x,next.y-this.position.y)<2*distance) {
+    if(!next || Math.sqrt((next.x-this.position.x)**2+(next.y-this.position.y)**2)<2*distance) {
       this.ni++
       if(this.ni>lane.length) {
         const connection=this.navigation.connections[this.pi-1]
@@ -54,9 +54,10 @@ export class EnemyPath implements EnemyRoute {
       next=lane[this.ni]
     }
     if(next) {
-      const dx=next.x-this.position.x,dy=next.y-this.position.y,length=Math.hypot(dx,dy)
+      const dx=next.x-this.position.x,dy=next.y-this.position.y,length=Math.sqrt(dx*dx+dy*dy)
       if(length) {
-        this.direction={x:dx/length,y:dy/length}
+        const angle=Math.atan2(dy,dx),x=Math.cos(angle),y=Math.sin(angle),norm=Math.sqrt(x*x+y*y)
+        this.direction={x:x/norm,y:y/norm}
         if(length<=distance){this.position.x=next.x;this.position.y=next.y}
         else {this.position.x+=this.direction.x*distance;this.position.y+=this.direction.y*distance}
       }
@@ -70,7 +71,7 @@ export class EnemyPath implements EnemyRoute {
     ni=Math.max(1,Math.min(lane.length,ni))
     for(let next=ni;next<=lane.length;next++)if(!valid||valid[next-1]){this.ni=next;break}
     Object.assign(this.position,lane[this.ni-1]);this.finished=false
-    const next=lane[this.ni];if(next){const dx=next.x-this.position.x,dy=next.y-this.position.y,length=Math.hypot(dx,dy);if(length)this.direction={x:dx/length,y:dy/length}}
+    const next=lane[this.ni];if(next){const dx=next.x-this.position.x,dy=next.y-this.position.y,length=Math.sqrt(dx*dx+dy*dy);if(length)this.direction={x:dx/length,y:dy/length}}
   }
   predict(distance:number):Point {
     const copy=new EnemyPath(this.paths,this.navigation,this.pi,this.spi)

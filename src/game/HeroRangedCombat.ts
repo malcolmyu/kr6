@@ -13,6 +13,7 @@ import {HomingBoltMotion} from './HomingBoltMotion.ts'
 import type {HomingConfig} from './HomingBoltMotion'
 interface BulletTemplate {bullet:HomingConfig&{particles_name?:string;damage_type:number;damage_factor:number;use_unit_damage_factor?:boolean;critical_chance?:number;pop?:string[];pop_chance?:number;pop_conds?:number;max_track_distance:number;hit_fx?:string};sound_events?:Record<string,string>}
 export interface HeroProjectile {nativePsCreated?:boolean;particleRotation?:number;id:number;name:string;born:number;pos:Point;to:Point;rotation:number;target:EnemyInstance;tracking:boolean;queuedAt:number;doneAt?:number;motion:HomingBoltMotion;damage:[number,number];damageFactor?:number;source?:HeroUnit;xpFactor?:number;pop?:string[];popChance?:number;popConds?:number}
+export interface HeroProjectileHit {p:HeroProjectile;value:number;result?:number;popOrder?:number;shared?:boolean;applied?:number}
 interface HeroRangedCycle {attack:HeroRangedAttack;target:EnemyInstance;predicted:Point;at:number;startedAt:number;previousReadyAt:number;previousRangedAt?:number;fired:boolean;critical:boolean}
 export class HeroRangedCombat {
   deferProjectileInsertSound=false
@@ -24,7 +25,8 @@ export class HeroRangedCombat {
   onRemoveProjectile:(p:HeroProjectile)=>void=()=>{}
   onDamageCreate:()=>number|void=()=>{}
   onEffectCreate:(name:string)=>void=()=>{}
-  private hits:{p:HeroProjectile;value:number;result?:number;popOrder?:number}[]=[]
+  private hits:HeroProjectileHit[]=[]
+  onQueueHit?: (hit:HeroProjectileHit,time:number)=>void
   readonly pops:DodgeSystem
   onSound:(name:string)=>void=()=>{}
   onEffect:(name:string,pos:Point,time:number,transform?:{rotation:number})=>void=()=>{}
@@ -81,7 +83,15 @@ export class HeroRangedCombat {
   }
   beginTick(time:number){
     for(let i=this.projectiles.length-1;i>=0;i--)if(this.projectiles[i].doneAt!==undefined&&time>this.projectiles[i].doneAt!)this.projectiles.splice(i,1)
-    for(let i=0;i<this.queuedProjectiles.length;){const p=this.queuedProjectiles[i];if(time<=p.queuedAt){i++;continue}this.queuedProjectiles.splice(i,1);p.born=time;p.rotation=Math.atan2(p.to.y-p.pos.y,p.to.x-p.pos.x);this.projectiles.push(p);const sound=this.templates[p.name].sound_events?.insert;if(sound&&!this.deferProjectileInsertSound)this.onSound(sound)}
+    for(let i=0;i<this.queuedProjectiles.length;){const p=this.queuedProjectiles[i];if(time<=p.queuedAt){i++;continue}this.insertProjectile(p,time)}
+  }
+  /** bolt.insert validates the captured target again after the queue boundary. */
+  insertProjectile(p:HeroProjectile,time:number,targetPresent=true){
+    const index=this.queuedProjectiles.indexOf(p);if(index>=0)this.queuedProjectiles.splice(index,1)
+    if(!targetPresent||(p.target.template.vis.bans&2)!==0)return false
+    p.born=time;p.rotation=Math.atan2(p.to.y-p.pos.y,p.to.x-p.pos.x);this.projectiles.push(p)
+    const sound=this.templates[p.name].sound_events?.insert;if(sound&&!this.deferProjectileInsertSound)this.onSound(sound)
+    return true
   }
   advanceHero(time:number,hero:HeroUnit,enemies:EnemyInstance[]){
 
@@ -121,13 +131,13 @@ export class HeroRangedCombat {
       const arrived=p.motion.step(p.pos,p.to,dt);if(!firstUpdate){p.rotation=p.motion.rotation;p.particleRotation=p.rotation}
       if(!arrived)return
       p.pos={...p.to}
-      if(!firstUpdate&&p.tracking&&e.hp>0&&!e.template.health.ignore_damage){const order=this.onDamageCreate();this.hits.push({p,popOrder:typeof order==='number'?order:undefined,value:bulletDamageValue(p.damage[0],p.damage[1],p.damageFactor??1,this.random)})}
+      if(!firstUpdate&&p.tracking&&e.hp>0&&!e.template.health.ignore_damage){const order=this.onDamageCreate();const hit:HeroProjectileHit={p,popOrder:typeof order==='number'?order:undefined,value:bulletDamageValue(p.damage[0],p.damage[1],p.damageFactor??1,this.random)};this.hits.push(hit);this.onQueueHit?.(hit,time)}
       if(b.hit_fx){this.onEffectCreate(b.hit_fx);this.onEffect(b.hit_fx,p.to,time,{rotation:p.rotation})}
       p.doneAt=time;this.onRemoveProjectile(p)
       }
   advanceParticles(time:number){this.trails.advance(time,this.projectiles.map(p=>({id:p.id,pos:p.pos,rotation:p.particleRotation??0})))}
   resolveHits(time:number){
-    for(let i=this.hits.length-1;i>=0;i--){const hit=this.hits[i],{p,value}=hit,e=p.target,b=this.templates[p.name].bullet;hit.result=0;if(e.hp<=0||e.template.health.ignore_damage)continue;recordEnemyDamage(e,b.damage_type,time);const before=e.hp,applied=predictDamage({...e.template.health,hp:e.hp},{value,damage_type:b.damage_type});e.hp=Math.max(0,e.hp-applied);hit.result=(applied>0?1:0)|(before>0&&e.hp<=0?2:0);if(p.source&&applied>0&&p.xpFactor)p.source.xpQueued+=applied*p.xpFactor;if(e.hp<=0){e.diedAt=time;this.onKill(e)}}
+    for(let i=this.hits.length-1;i>=0;i--){const hit=this.hits[i],{p,value}=hit,e=p.target,b=this.templates[p.name].bullet;if(hit.shared)continue;hit.result=0;hit.applied=0;if(e.hp<=0||e.template.health.ignore_damage)continue;recordEnemyDamage(e,b.damage_type,time);const before=e.hp,applied=predictDamage({...e.template.health,hp:e.hp},{value,damage_type:b.damage_type});e.hp=Math.max(0,e.hp-applied);hit.applied=applied;hit.result=(applied>0?1:0)|(before>0&&e.hp<=0?2:0);if(p.source&&applied>0&&p.xpFactor)p.source.xpQueued+=applied*p.xpFactor;if(e.hp<=0){e.diedAt=time;this.onKill(e)}}
     for(const {p,result,popOrder}of this.hits)this.pops.showDamage(undefined,p.target,time,p.pop,p.popChance,p.popConds,result,popOrder)
     this.hits=[]
   }

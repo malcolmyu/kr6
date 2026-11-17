@@ -11,7 +11,7 @@ import type {LevelData,GameMode} from './types'
 
 const defaults=rawDefaults as unknown as Record<string,BootstrapTemplateDefaults>
 export interface RuntimeEntityEvent {tick:number;kind:string;id:number;template:string;holder?:string}
-type Binding={kind:'archerMark'|'copyBounce'|'copyAura'|'firebookBurn'|'enemyTeleport'|'heroLife'|'enemyArrow'|'enemyArrowEffect'|'zefiraHammer'|'geraldModifier'|'zefiraShield'|'smoke'|'royal'|'rainControl'|'meteor'|'particle'|'reinforcementControl'|'archerShooter'|'ambient'|'fishing'|'tower'|'enemy'|'soldier'|'hero'|'heroProjectile'|'projectile'|'pop'|'scene';model:object}
+type Binding={kind:'culverineNative'|'reinforcementSpecial'|'knightLegacyAura'|'knightLegacyStun'|'knightArmor'|'wizardEmpower'|'archerRange'|'archerPierceRay'|'archerPierceStun'|'archerMark'|'copyBounce'|'copyAura'|'firebookBurn'|'enemyTeleport'|'heroLife'|'enemyArrow'|'enemyArrowEffect'|'zefiraHammer'|'geraldModifier'|'zefiraShield'|'smoke'|'royal'|'rainControl'|'meteor'|'particle'|'reinforcementControl'|'archerShooter'|'ambient'|'fishing'|'tower'|'enemy'|'soldier'|'hero'|'heroProjectile'|'projectile'|'pop'|'scene';model:object}
 /** Actual normal-session allocation/queue owner. Unported script families
  * still need their callbacks wired here; events expose those gaps rather
  * than reading a native trace to guess missing IDs. */
@@ -22,7 +22,7 @@ export class RuntimeEntities {
  onModelInsert:(model:object,kind:string)=>boolean|void=()=>{}
  onTowerInsert:(template:string)=>void=()=>{}
  onTowerReplace:(site:TowerSite,id:number)=>void=()=>{}
- onModelRemove:(model:object,kind:string,template:string)=>boolean|void=()=>{}
+ onModelRemove:(model:object,kind:string,template:string,id:number)=>boolean|void=()=>{}
  private bindings=new Map<BootstrapEntity,Binding>()
  private byModel=new WeakMap<object,BootstrapEntity>()
  private tweens=new WeakMap<object,(time:number)=>void>()
@@ -38,7 +38,7 @@ export class RuntimeEntities {
     if(e.holderId){const site=sites.find(s=>s.id===e.holderId);if(site){this.bind(e,site,'tower');this.onTowerInsert(e.template)}}
     return true
    },
-   onRemove:e=>{const b=this.bindings.get(e);if(b&&this.onModelRemove(b.model,b.kind,e.template)===false){e.pending_removal=false;this.record('removeRejected',e);return false}this.persistent.remove(e);this.record('remove',e);return true},
+   onRemove:e=>{const b=this.bindings.get(e);if(b&&this.onModelRemove(b.model,b.kind,e.template,e.id)===false){e.pending_removal=false;this.record('removeRejected',e);return false}this.persistent.remove(e);this.record('remove',e);return true},
   })
   const create=this.registry.create.bind(this.registry)
   this.registry.create=factory=>{const e=create(factory);this.record('create',e);return e}
@@ -57,6 +57,28 @@ export class RuntimeEntities {
    if(binding&&model&&(model.enemy===target||model.target===target))filtered.set(entity.id,binding)
   }
   yield*filtered.values()
+ }
+ /** Generic mod_lifecycle filtering uses captured IDs even after target replacement. */
+ *modifiersForEntityId(id:number|undefined):Generator<Binding>{
+  const filtered=new LuaEntityTable<Binding>()
+  for(const entity of this.persistent.get('modifiers').values()){
+   const binding=this.bindings.get(entity),model=binding?.model as {targetId?:number}|undefined
+   if(binding&&model&&model.targetId===id)filtered.set(entity.id,binding)
+  }
+  yield*filtered.values()
+ }
+ /** tower_upgrade1472 filters the live global entity table, preserving its
+  * traversal in an array, rather than the persistent modifier-table layout. */
+ *towerModifiersFor(target:object):Generator<Binding>{
+  const id=this.entity(target)?.id
+  if(id===undefined)return
+  for(const entity of this.registry.entities.values()){
+   if(!entity.modifier)continue
+   const binding=this.bindings.get(entity),model=binding?.model as {targetId?:number;site?:object;target?:object;enemy?:object}|undefined
+   if(!binding||!model)continue
+   const targetId=model.targetId??this.entity(model.target??model.enemy??model.site??{})?.id
+   if(targetId===id)yield binding
+  }
  }
  bindInitial(model:object,name:string,kind:Binding['kind']){
   const entity=this.registry.pendingInserts.find(e=>e.template===name&&!this.bindings.has(e))
@@ -91,7 +113,7 @@ export class RuntimeEntities {
  timedPhase(){
   for(const entity of this.registry.entities.values()){
    const t=this.timed.get(entity);if(!t)continue
-   if(t.frames!==undefined&&nativeLogicAnimationFrame(t.frames,this.registry.time,t.ts,false,t.fps).runs===(t.runs??1)||t.duration!==undefined&&this.registry.time-t.ts>t.duration){this.registry.queueRemove(entity);this.timed.delete(entity)}
+   if(t.runs!==undefined&&t.frames!==undefined&&nativeLogicAnimationFrame(t.frames,this.registry.time,t.ts,false,t.fps).runs===t.runs||t.duration!==undefined&&this.registry.time-t.ts>t.duration){this.registry.queueRemove(entity);this.timed.delete(entity)}
   }
  }
  setTween(model:object,update:(time:number)=>void){this.tweens.set(model,update)}

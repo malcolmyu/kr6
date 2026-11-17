@@ -51,6 +51,8 @@ export class BuyAvailableSystem {
  sitesInOrder:()=>TowerSite[]
  readonly indicators=new Map<string,BuyIndicator>()
  onCreate:(site:TowerSite,time:number)=>void=()=>{}
+ onRemove:(state:BuyIndicator)=>void=()=>{}
+ targetPresent:(state:BuyIndicator)=>boolean=()=>true
  forceCheck=false
  animationTs=0
  private started=false
@@ -75,6 +77,7 @@ export class BuyAvailableSystem {
   }
   for(const state of this.indicators.values()){
    if(time<state.insertAt||time-state.checkedAt<.2)continue
+   if(!this.targetPresent(state)){this.onRemove(state);this.indicators.delete(state.site.id);continue}
    const site=state.site,key=site.building&&time>=(site.buildStartsAt??0)?site.building:site.tower??site.holder,template=this.templates[key]
    const target={...template,ui:{...template.ui,...(site.canBeModified===false?{can_click:false}:{})},...(template.powers?{powers:Object.fromEntries(Object.entries(template.powers).map(([k,p])=>[k,{...p,level:site.powerLevels?.[k]??p.level}]))}:{})}
    state.hidden=buyAvailableHidden(target,gold,this.minCost,hide,[...this.towers.locked],this.templates)

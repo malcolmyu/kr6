@@ -1,0 +1,2 @@
+import {execFileSync} from 'node:child_process'
+for(const [rank,kind]of [[1,'normal'],[2,'normal'],[3,'normal'],[1,'initial'],[2,'initial'],[3,'initial'],...[ 'idle','death-before','death-between','stun-before','stun-between','upgrade-cast','rally-before','rally-between'].map(kind=>[1,kind])])process.stdout.write(execFileSync(process.execPath,['scripts/verify_knight_heal_native_chain.mjs',String(rank),kind]))

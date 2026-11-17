@@ -1,7 +1,7 @@
 import type { LevelData, GameMode, Point } from './types'
 export type TowerKind = 'archers' | 'wizard' | 'knights' | 'catapult' | 'culverine'
 export interface TowerPower {level:number;max_level:number;price:number[];price_base?:number;price_inc?:number}
-export const implementedTowerPowers:Record<string,string[]>={archers:['skill_b','skill_c'],wizard:['skill_a','skill_b','skill_c'],catapult:['skill_a','skill_b','skill_c']}
+export const implementedTowerPowers:Record<string,string[]>={archers:['skill_a','skill_b','skill_c'],wizard:['skill_a','skill_b','skill_c'],catapult:['skill_a','skill_b','skill_c'],knights:['skill_a','skill_b','skill_c']}
 export interface TowerTemplate {
   powers?:Record<string,TowerPower>
   tower: { price:number; refund_factor:number; level:number; type:string;menu_offset?:Point;range_offset?:Point }
@@ -12,7 +12,7 @@ export interface TowerTemplate {
 export interface TowerSite {
   id:string; pos:Point; terrain:number; holder:string; rally:Point
   tower?:string; building?:string; buildStartsAt?:number;completionQueuedAt?:number;completesAt?:number; spent:number
-  instance?:number;powerLevels?:Record<string,number>;powerPreview?:string
+  powerChanges?:Set<string>;instance?:number;powerLevels?:Record<string,number>;powerPreview?:string
   selling?:boolean
   canBeModified?:boolean
   vis?:{flags:number;bans:number};towerBlocked?:boolean;canBeMod?:boolean;damageFactor?:number;rangeFactor?:number;attackDisabled?:boolean;attackBansOverride?:number
@@ -71,7 +71,7 @@ export class TowerSystem {
     const site=this.sites.find(s=>s.id===id),next=site?this.nextPower(site,power):undefined
     if(!site||!next)throw new Error('此防御塔技能无法升级')
     if(gold<next.price)throw new Error('金币不足')
-    site.powerLevels={...site.powerLevels,[power]:next.level};site.spent+=next.price;site.powerPreview=undefined
+    site.powerLevels={...site.powerLevels,[power]:next.level};(site.powerChanges??=new Set()).add(power);site.spent+=next.price;site.powerPreview=undefined
     return gold-next.price
   }
   refund(site:TowerSite,wave:number):number {
@@ -82,7 +82,7 @@ export class TowerSystem {
     const site=this.sites.find(s=>s.id===id)
     if(!site?.tower || site.building || site.canBeModified===false)throw new Error('此防御塔无法出售')
     const refund=this.refund(site,wave)
-    site.tower=undefined;site.spent=0;site.instance=(site.instance??0)+1;site.powerLevels=undefined;site.powerPreview=undefined;site.attackDisabled=undefined;site.attackBansOverride=undefined
+    site.tower=undefined;site.spent=0;site.instance=(site.instance??0)+1;site.powerLevels=undefined;site.powerChanges=undefined;site.powerPreview=undefined;site.damageFactor=1;site.rangeFactor=undefined;site.attackDisabled=undefined;site.attackBansOverride=undefined
     return gold+refund
   }
   build(id:string,kind:TowerKind,gold:number,time:number):number {

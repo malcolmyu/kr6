@@ -9,11 +9,12 @@ export interface CulverineTowerState {key:string;parts:CulverinePart[];phase:'id
 export interface CulverineTarget {enemy:EnemyInstance;point:Point}
 /** Basic-attack branch of native Culverine21525; skill branches are separate work. */
 export class CulverineTowerSystem {
+ native=false
  readonly states=new Map<string,CulverineTowerState>()
  private templates:Record<string,Template>
  private random:()=>number
  onSound:(name:string)=>void=()=>{}
- onShoot:(name:string,from:Point,to:Point,target:EnemyInstance,factor:number,time:number)=>void=()=>{}
+ onShoot:(name:string,from:Point,to:Point,target:EnemyInstance,factor:number,time:number,site:TowerSite)=>void=()=>{}
  constructor(templates:Record<string,Template>,random:()=>number=Math.random){this.templates=templates;this.random=random}
  private pose(s:CulverineTowerState,site:TowerSite,name:string,point:Point,time:number,loop:boolean){
   const angle=Math.atan2(point.x-site.pos.x,point.y-site.pos.y)*180/Math.PI,abs=Math.abs(angle),q=abs<35?1:abs<70?2:abs<120?3:4,flip=angle<=0
@@ -27,15 +28,15 @@ export class CulverineTowerSystem {
   s.phase='windup';s.phaseAt=time;s.attackAt=time;s.target=target.enemy;s.point={...target.point};s.fired=false
  }
  private finished(p:CulverinePart,time:number){const d=(times as Record<string,Record<string,number>>)[p.prefix!][p.name];return nativeLogicAnimationFrame(Math.round(d*30),time,p.ts,p.loop,30).runs>0}
- advance(time:number,sites:TowerSite[],pick:(site:TowerSite)=>CulverineTarget|undefined,updateSites:TowerSite[]=sites){
+ advance(time:number,sites:TowerSite[],pick:(site:TowerSite,ranged?:boolean)=>CulverineTarget|undefined,updateSites:TowerSite[]=sites){
   const live=new Set(sites.filter(site=>site.tower?.startsWith('tower_culverine_')).map(site=>site.id))
   for(const site of updateSites){if(!site.tower?.startsWith('tower_culverine_'))continue;
    const t=this.templates[site.tower],a=t.attacks.list[0];let s=this.states.get(site.id)
-   if(!s||s.key!==site.tower){s={key:site.tower,parts:t.render.sprites.map(p=>({prefix:p.prefix,name:p.name,ts:0,flip:false,hidden:p.hidden??false,loop:p.loop??true})),phase:'idle',phaseAt:time,attackAt:time-a.cooldown,point:{x:site.pos.x+1,y:site.pos.y},quadrant:3,fired:false};this.states.set(site.id,s);this.pose(s,site,'idle',s.point,time,true)}
+   if(!s||s.key!==site.tower){s={key:site.tower,parts:t.render.sprites.map(p=>({prefix:p.prefix,name:this.native?p.name.replace('%04i',String(site.terrain??1).padStart(4,'0')):p.name,ts:0,flip:false,hidden:p.hidden??false,loop:p.loop??true})),phase:'idle',phaseAt:time,attackAt:time-a.cooldown,point:{x:site.pos.x+1,y:site.pos.y},quadrant:3,fired:false};this.states.set(site.id,s);this.pose(s,site,'idle',s.point,time,true)}
    if(s.phase==='yield'){s.phase='idle'}
    if(s.phase==='idle'){
     if(site.towerBlocked||site.attackDisabled)continue
-    const target=pick(site);if(target){this.pose(s,site,'idle',target.enemy.path.position,time,true);this.start(s,site,t,target,time)}
+    const look=pick(site,false);if(look){this.pose(s,site,'idle',look.enemy.path.position,time,true);const target=pick(site,true);if(target)this.start(s,site,t,target,time);else s.attackAt=time-a.cooldown+10/30}
     continue
    }
    if(s.phase==='windup'){
@@ -43,7 +44,7 @@ export class CulverineTowerSystem {
     if(site.towerBlocked||site.attackDisabled){s.phase='yield';continue}
     this.onSound(a.sound);const offset=a.bullet_start_offset[s.quadrant-1],flip=s.parts[1].flip
     const critical=this.random()<a.critical_chance
-    this.onShoot(a.bullet,{x:site.pos.x+offset.x*(flip?-1:1),y:site.pos.y+offset.y},{...s.point},s.target!,(site.damageFactor??1)*(critical?2:1),time)
+    this.onShoot(a.bullet,{x:site.pos.x+offset.x*(flip?-1:1),y:site.pos.y+offset.y},{...s.point},s.target!,(site.damageFactor??1)*(critical?2:1),time,site)
     s.fired=true;s.phase=t.tower.level===4?'body':'rest';s.phaseAt=time
    }
    if(s.phase==='rest'){
@@ -51,12 +52,12 @@ export class CulverineTowerSystem {
     s.phase='body'
    }
    if(s.phase==='body'){
-    if(!this.finished(s.parts[2],time)){const target=pick(site);if(target)s.point={...target.point};continue}
+    if(!this.finished(s.parts[2],time)){if(t.tower.level!==4){const target=pick(site,false);if(target)s.point={...target.point}}continue}
     if(t.tower.level===4){s.parts[2].name=a.animation_reload!;s.parts[2].ts=time;s.parts[2].loop=false;s.phase='reload'}
     else{s.phase='reload'}
    }
    if(s.phase==='reload'){
-    if(!this.finished(s.parts[2],time)){const target=pick(site);if(target)s.point={...target.point};continue}
+    if(!this.finished(s.parts[2],time)){const target=pick(site,false);if(target)s.point={...target.point};continue}
     // Basic cooldown equals its animation budget; native U.y_wait(0) does not yield here.
     this.pose(s,site,'idle',s.point,time,true);s.phase='yield';s.phaseAt=time
    }

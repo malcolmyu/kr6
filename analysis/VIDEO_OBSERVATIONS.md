@@ -1243,3 +1243,14 @@ C 已接入真实 bounce / 第二次投书 / 地面书 own-main / shard / tween�
 
 
 2026-11-16后续：修正敌人等待到位标志、单位已处槽位时的标志更新、箭矢闪避飘字/落空贴花分配顺序、杰拉尔德攻击后移动的浮点下一帧延迟，以及投石器/法师弹丸延后初始化抢占宝石携带者随机数的问题。原版普通第三关战役连续11693帧/12894事件/41765随机数边界匹配，含440帧真实揭示弱点状态；第11694帧杰拉尔德目标保留仍有差异。既有8699帧3-2 Chrome通关与弓箭C三档正常菜单浏览器回归均通过。完整战斗/视频验收未完成，见 NATIVE_CAMPAIGN_CONTINUATIONS.md。
+
+
+2026-11-16: Archer C ordinary third-campaign full native and Chrome comparison passes14014ticks through natural defeat,1568sound requests and1287painter checkpoints. See ARCHERS_MARK_COMPLETE_BATTLE.md. This is not full video, fresh-save progression or perceived-audio acceptance.
+
+2026-11-16 follow-up: Archer A now has registered ray/damage-pop/stun and renderer integration,72original stun lifecycle cases/20160frames,6quiet original full chains/3600frames, Chrome ray/stun/audio/sale cleanup and canonical3-2 victory regression passing. All default tests/build pass. Purchase menu remains disabled pending release-boundary upgrades, complete A/B/C and ordinary mixed-battle acceptance; see ARCHERS_PIERCE_RUNTIME.md.
+
+2026-11-16: Archer A three150-gold menu purchases are enabled and Chrome-tested. Exact-release damage/template and A/C power-update placement fixed from original traces. Ordinary campaign native/Chrome full13401ticks/14841events/1489sounds and935native painter checkpoints/84048submitted frames pass through natural defeat. Native rank3 stun is rejected8/8times because those hit targets are dead; survival/duration is separately covered. All final default tests/build pass. Full B/A/B/C, missing powers, six-route fresh-save and video/listened-audio scope remains active; see ARCHERS_PIERCE_PURCHASES_BATTLE.md.
+
+2026-11-16: B source execution moved from global maintenance to its actual tower main between A/C, with shared power-update slots.42original source cases/35700frames and normal B menu/effect/wizard-range/target-upgrade/sale browser checks pass; full final default tests/build pass. Full B entity comparison remains explicitly red at21: missing native eagle78/range modifier79 (webnext78 vsnative80). This is a source-phase milestone, not formal B/A/B/C entity or video acceptance; see ARCHERS_ABC_SOURCE_PHASE.md.
+
+2026-11-16: B native entity gap resolved.9original full chains/5700frames and registered preview/buff/eagle/target-upgrade/source-sale Chrome pass. Ordinary third campaign native+Chrome matches14014ticks/15145events/43154RNG/1576named sound requests and1786painter checkpoints/166509submitted frames through natural defeat. Large544843024byte oracle is preserved and read through lossless SHA-bound frame streaming. All default tests/build pass. Full video/fresh-save/remaining powers and broader A/B/C/source/rebuild combinations remain active; see ARCHERS_RANGE_NATIVE_RUNTIME.md.

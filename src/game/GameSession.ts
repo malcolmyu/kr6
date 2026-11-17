@@ -1,3 +1,11 @@
+import {HealthBarRuntime} from './HealthBarRuntime.ts'
+import {ReinforcementSpecialRuntime} from './ReinforcementSpecialRuntime.ts'
+import type {ReinforcementSpecialModel} from './ReinforcementSpecialRuntime.ts'
+import {KnightLegacySystem} from './KnightLegacy.ts'
+import type {KnightLegacyAura} from './KnightLegacy.ts'
+import {KnightHealSystem} from './KnightHeal.ts'
+import {KnightArmorSystem} from './KnightArmor.ts'
+import type {KnightArmorAura} from './KnightArmor'
 import {WizardCopiesRuntime} from './WizardCopiesRuntime.ts'
 import type {WizardCopiesBounce,WizardCopiesAura} from './WizardCopiesRuntime'
 import copiesData from '../../public/data/wizard-copies-trail.json' with {type:'json'}
@@ -15,7 +23,11 @@ import {globalUpgradeTemplates} from './GlobalUpgrades.ts'
 import type {GlobalUpgradeSelection} from './GlobalUpgrades'
 import {catapultTrapPositions} from './CatapultTrapPlacement.ts'
 import {WizardEmpowerSystem} from './WizardEmpower.ts'
+import type {NativeRangeModel,NativeRangeBuff} from './ArcherRangeRuntime'
 import {ArcherRangeSystem} from './ArcherRange.ts'
+import {ArcherPierceStunSystem} from './ArcherPierceStun.ts'
+import type {ArcherPierceStun} from './ArcherPierceStun'
+import type {ArcherPierceRay} from './ArcherPierceRay'
 import {ArcherMarkRuntime} from './ArcherMarkRuntime.ts'
 import type {ArcherMark} from './ArcherMarkRuntime'
 import {EnemyTeleport} from './EnemyTeleport.ts'
@@ -73,14 +85,21 @@ export interface EnemyInstance {
   frozen?:boolean;animationAge?:number
 }
 export class GameSession {
+  readonly healthBars=new HealthBarRuntime()
   readonly paintOrder=new UnitPainterHistory()
   readonly enemyDeaths:EnemyDeathSystem
   readonly staticEffects:StaticEffects
   readonly enemies: EnemyInstance[] = []
   readonly waves: WaveRunner
   readonly towers: TowerSystem
+  readonly knightArmor=new KnightArmorSystem()
+  readonly knightHeal=new KnightHealSystem()
+  readonly knightLegacy:KnightLegacySystem
+  readonly reinforcementSpecial:ReinforcementSpecialRuntime
+  private soldKnightRosters=new Map<number,SoldierInstance[]>()
   readonly wizardEmpower:WizardEmpowerSystem
   readonly archerRange:ArcherRangeSystem
+  readonly archerPierceStun:ArcherPierceStunSystem
   readonly archerMark:ArcherMarkRuntime
   readonly wizardCopies:WizardCopiesRuntime
   readonly combat:RangedCombat
@@ -181,7 +200,11 @@ export class GameSession {
     this.combat.onDamageCreate=()=>this.entities?.allocate('damage').id
     this.combat.onEffectCreate=(name,time,pos,transform)=>{if(!this.staticEffects.queue(name,pos,time,transform)){const model={name,pos:{...pos},at:time};this.nativeEffects.push(model);this.entities?.queue(name,model)}}
     this.wizardEmpower=new WizardEmpowerSystem(templates as unknown as ConstructorParameters<typeof WizardEmpowerSystem>[0]);this.combat.wizardTowers.empower=this.wizardEmpower;this.combat.wizardTowers.onSound=name=>this.onSound(name)
-    this.archerRange=new ArcherRangeSystem(templates as unknown as ConstructorParameters<typeof ArcherRangeSystem>[0]);this.archerRange.onSound=name=>this.onSound(name);this.archerRange.onCast=(site,time)=>{const state=this.combat.shooters.get(site.id);if(state)state.archerTs=time}
+    this.archerRange=new ArcherRangeSystem(templates as unknown as ConstructorParameters<typeof ArcherRangeSystem>[0]);this.archerRange.deferSources=true;this.combat.onArcherPowerUpdates=(site,time)=>this.archerRange.syncUpgrades(site,time);this.combat.onArcherRangeMain=(site,time)=>this.archerRange.advanceSource(site,time,this.entities?[...this.entities.persistent.get('towers').values()].filter(e=>!e.pending_removal).flatMap(e=>{const s=this.towers.sites.find(s=>this.entities!.entity(s)===e);return s?[s]:[]}):this.towers.sites);this.archerRange.onSound=name=>this.onSound(name);this.archerRange.onCast=(site,time)=>{const state=this.combat.shooters.get(site.id);if(state)state.archerTs=time}
+    this.reinforcementSpecial=new ReinforcementSpecialRuntime(templates as unknown as ConstructorParameters<typeof ReinforcementSpecialRuntime>[0])
+    this.knightLegacy=new KnightLegacySystem(this.random)
+    this.archerPierceStun=new ArcherPierceStunSystem(templates as unknown as ConstructorParameters<typeof ArcherPierceStunSystem>[0])
+    this.combat.archerPierceRays.onModifier=(name,enemy)=>this.archerPierceStun.queue(name,enemy)
     this.archerMark=new ArcherMarkRuntime(templates.mod_archers_skill_c_weak as unknown as ConstructorParameters<typeof ArcherMarkRuntime>[0])
     if(this.combat.archerMarkCaster){
       this.combat.archerMarkCaster.onEagle=(name,enemy,time)=>{
@@ -208,6 +231,13 @@ export class GameSession {
       if(this.entities&&pos&&time!==undefined){const model={name,pos:{...pos},at:time};this.nativeEffects.push(model);this.entities.queue(name,model)}
       else this.entities?.queue(name)
     }
+    this.barracks.onSpecialFirstMain=(s,time)=>this.reinforcementSpecial.start(s,time)
+    this.barracks.onKnightTowerLoop=site=>{this.knightArmor.towerLoop(site,this.barracks.soldiers);this.knightHeal.towerLoop(site,this.barracks.soldiers);this.knightLegacy.towerLoop(site,this.barracks.soldiers)}
+    this.barracks.onKnightSkillMain=(s,outer)=>{this.knightArmor.soldierMain(s,outer);this.knightHeal.powerMain(s,outer,this.time);this.knightLegacy.soldierMain(s,outer)}
+    this.barracks.onKnightCastMain=(s,time)=>this.knightHeal.advance(s,time)
+    this.barracks.onKnightInCooldown=(s,time)=>{this.knightHeal.tryStart(s,time)}
+    this.barracks.onKnightMeleeModifier=(key,enemy,soldier,level,time)=>this.knightLegacy.stuns.queue(key,enemy,{sourceId:this.entities?.entity(soldier)?.id,targetId:this.entities?.entity(enemy)?.id,level,ts:time})
+    this.knightHeal.onSound=name=>this.onSound(name)
     this.barracks.onCreate=s=>this.entities?.queue(s.name,s,s.hero?'hero':'soldier')
     this.towers.onCompletionQueued=(site,name,time)=>this.entities?.scheduleTower(site,name,Math.round(time*30),true)
     this.combat.dodges=this.barracks.dodges
@@ -215,6 +245,7 @@ export class GameSession {
     this.powers.royal.runtime.onQueue=(name,model)=>this.entities?.queue(name,model,'royal')
     this.powers.royal.runtime.onRemove=model=>this.entities?.remove(model)
     this.powers.royal.runtime.siteId=site=>this.entities?.entity(site)?.id
+    this.powers.royal.runtime.hasTower=site=>{if(!this.entities)return !!site.tower;const id=this.entities.entity(site)?.id,entity=id===undefined?undefined:this.entities.registry.entities.get(id);return !!entity&&/^tower_(archers|wizard|knights|catapult|culverine)_lvl/.test(entity.template)}
     this.powers.onQueueRainControl=c=>this.entities?.queue('power_rain_of_fire_control',c,'rainControl')
     this.powers.rainControl.onRemove=c=>this.entities?.remove(c)
     this.powers.onQueueMeteor=shot=>this.entities?.queue('bullet_power_rain_of_fire',shot,'meteor')
@@ -232,9 +263,10 @@ export class GameSession {
     this.powers.rainAreas.targetValid=this.combat.targetValid
     this.powers.royal.onRespawn=site=>this.barracks.respawnDead(site,!!this.entities)
     this.powers.royal.onGold=(amount,pos)=>{this.gold+=amount;this.onSound('GUICoins');this.waves.signal('got-gold');this.onCommand({name:'signal',signal_name:'got-gold',value:[pos,amount]})}
-    this.powers.royal.onResetSkills=site=>{this.combat.wizardTowers.resetSkillCooldowns(site,this.time);this.archerRange.resetSkillCooldowns(site,this.time);this.combat.archerMarkCaster?.resetSkillCooldowns(site,this.time);this.combat.catapultTowers.resetSkillCooldowns(site,this.time)}
+    this.powers.royal.onResetSkills=site=>{this.combat.wizardTowers.resetSkillCooldowns(site,this.time);this.archerRange.resetSkillCooldowns(site,this.time);this.combat.archerMarkCaster?.resetSkillCooldowns(site,this.time);this.combat.archerPierceCaster?.resetSkillCooldowns(site,this.time);this.combat.catapultTowers.resetSkillCooldowns(site,this.time)}
     this.powers.canUse=kind=>this.waves.wave>0&&(!this.tutorial||this.tutorial.unlockedPowers.has(kind))
     this.enemySkills=new EnemySkills(level,templates as unknown as ConstructorParameters<typeof EnemySkills>[1],random);this.enemySkills.onSound=name=>this.onSound(name)
+    this.enemySkills.onHealthBarAlpha=(source,alpha)=>this.healthBars.setAlpha(source,alpha)
     this.enemyRanged=new EnemyRangedCombat(level,templates as unknown as ConstructorParameters<typeof EnemyRangedCombat>[1],random);this.enemyRanged.onSound=name=>this.onSound(name);this.enemyRanged.onKill=reward
     this.enemyRanged.dodges=this.barracks.dodges
     this.enemyTeleports=new EnemyTeleport(templates.mod_gerald_skill_c_teleport as unknown as ConstructorParameters<typeof EnemyTeleport>[0])
@@ -318,10 +350,15 @@ export class GameSession {
     if(!site?.tower||site.building||site.canBeModified===false||site.selling)throw new Error('此防御塔无法出售')
     const sound=this.templates[site.tower].sound_events?.sell
     const sell=()=>{
+      if(this.entities)for(const binding of this.entities.towerModifiersFor(site))this.entities.remove(binding.model)
+      else this.powers.royal.remove(id)
       this.gold=this.towers.sell(id,this.gold,this.waves.wave);site.selling=false
       const indicator=this.buyAvailable.indicators.get(id)
       if(indicator){this.entities?.remove(indicator);this.buyAvailable.indicators.delete(id)}
-      this.powers.royal.remove(id);this.combat.shooters.delete(id);this.barracks.removeSite(id)
+      // Native tower removal owns the old roster, even after sale clears the site.
+      const sourceId=this.entities?.entity(site)?.id
+      if(sourceId!==undefined&&this.entities?.entity(site)?.template.startsWith('tower_knights_'))this.soldKnightRosters.set(sourceId,this.barracks.soldiers.filter(s=>s.siteId===id).sort((a,b)=>a.slot-b.slot))
+      this.combat.shooters.delete(id);this.barracks.removeSite(id)
     }
     const dust=()=>{
       const model={name:'fx_tower_sell_dust',pos:{x:site.pos.x,y:site.pos.y+35},at:this.time}
@@ -339,17 +376,63 @@ export class GameSession {
     const team=this.heroes.team.length?this.heroes.team.map(h=>h.name):stage===1?['hero_gerald']:['hero_gerald','hero_zefira']
     this.entities=new RuntimeEntities(this.level,stage,this.mode,team,campaignComplete,this.towers.sites,restarted,skipCutscenes)
     this.entities.onTowerInsert=name=>{const sound=this.templates[name].sound_events?.insert;if(sound)this.onSound(sound)}
+    this.heroes.ranged.onQueueHit=hit=>{
+      hit.shared=true
+      this.combat.queueSharedDamage(hit.p.target,{value:hit.value,damage_type:(this.templates[hit.p.name] as unknown as CombatTemplate).bullet!.damage_type},hit.popOrder,(applied,result)=>{hit.applied=applied;hit.result=result;if(hit.p.source&&applied>0&&hit.p.xpFactor)hit.p.source.xpQueued+=applied*hit.p.xpFactor})
+    }
+    this.barracks.nativeSpecialAuras=true
+    this.reinforcementSpecial.id=m=>this.entities!.entity(m)?.id
+    this.reinforcementSpecial.present=id=>id!==undefined&&!!this.entities!.registry.entities.get(id)
+    this.reinforcementSpecial.units=()=>[...this.entities!.bindingsInOrder()].filter(b=>b.kind==='soldier'||b.kind==='hero').map(b=>b.model as SoldierInstance)
+    this.reinforcementSpecial.candidates=(id,key)=>[...this.entities!.modifiersForEntityId(id)].filter(b=>b.kind==='reinforcementSpecial'&&(b.model as ReinforcementSpecialModel).key===key).map(b=>b.model as ReinforcementSpecialModel)
+    this.reinforcementSpecial.onQueue=m=>this.entities!.queue(m.key,m,'reinforcementSpecial')
+    this.reinforcementSpecial.onRemove=m=>this.entities!.remove(m)
+    this.knightLegacy.id=s=>this.entities!.entity(s)?.id
+    this.knightLegacy.present=id=>id!==undefined&&!!this.entities!.registry.entities.get(id)
+    this.knightLegacy.soldiers=()=>this.barracks.soldiers.filter(s=>this.knightLegacy.present(this.entities!.entity(s)?.id))
+    this.knightLegacy.onQueue=m=>this.entities!.queue('aura_knights_skill_c_check',m,'knightLegacyAura')
+    this.knightLegacy.onRemove=m=>this.entities!.remove(m)
+    this.knightLegacy.stuns.present=e=>this.knightLegacy.present(this.entities!.entity(e)?.id)
+    this.knightLegacy.stuns.onQueue=m=>this.entities!.queue(m.key,m,'knightLegacyStun')
+    this.knightLegacy.stuns.onRemove=m=>this.entities!.remove(m)
+    this.knightArmor.id=s=>this.entities!.entity(s)?.id
+    this.knightArmor.present=id=>id!==undefined&&!!this.entities!.registry.entities.get(id)
+    this.knightArmor.heroes=()=>this.heroes.team.filter(h=>{const id=this.entities!.entity(h)?.id;return id!==undefined&&!!this.entities!.registry.entities.get(id)})
+    this.knightArmor.onQueue=m=>this.entities!.queue('aura_knights_skill_a_check',m,'knightArmor')
+    this.knightArmor.onRemove=m=>this.entities!.remove(m)
     this.combat.firebook.native=true
     const firebook=this.combat.firebook.runtime
     firebook.present=e=>{const entity=this.entities!.entity(e);return !!entity&&!!this.entities!.registry.entities.get(entity.id)}
     firebook.candidates=e=>[...this.entities!.modifiersFor(e)].filter(b=>b.kind==='firebookBurn').map(b=>b.model as import('./FirebookBurnRuntime').NativeFirebookBurn)
     firebook.onQueue=m=>this.entities!.queue('mod_firebook_aura',m,'firebookBurn')
     firebook.onRemove=m=>this.entities!.remove(m)
+    this.wizardEmpower.native=true
+    const empower=this.wizardEmpower.runtime
+    empower.id=site=>this.entities!.entity(site)?.id
+    empower.present=id=>id!==undefined&&!!this.entities!.registry.entities.get(id)
+    empower.candidates=(id,kind)=>[...this.entities!.modifiersForEntityId(id)].filter(b=>b.kind==='wizardEmpower'&&(b.model as import('./WizardEmpowerRuntime').NativeEmpowerModel).kind===kind).map(b=>b.model as import('./WizardEmpowerRuntime').NativeEmpowerModel)
+    empower.onQueue=(name,m)=>this.entities!.queue(name,m,'wizardEmpower')
+    empower.onRemove=m=>this.entities!.remove(m)
+    this.wizardEmpower.sitesInOrder=()=>[...this.entities!.persistent.get('towers').values()].filter(e=>!e.pending_removal).flatMap(e=>{const site=this.towers.sites.find(s=>this.entities!.entity(s)===e);return site?[site]:[]})
+    this.archerRange.native=true
+    const range=this.archerRange.runtime
+    range.id=site=>this.entities!.entity(site)?.id
+    range.present=id=>id!==undefined&&!!this.entities!.registry.entities.get(id)
+    range.candidates=target=>[...this.entities!.modifiersFor(target)].filter(b=>b.kind==='archerRange'&&(b.model as NativeRangeBuff).targetId===range.id(target)).map(b=>b.model as NativeRangeBuff)
+    range.candidatesForSource=id=>{const models=new Map([...this.entities!.bindingsInOrder('archerRange')].filter(b=>(b.model as NativeRangeModel).kind==='buff').map(b=>[this.entities!.entity(b.model)!.id,b.model as NativeRangeBuff]));return [...this.entities!.persistent.get('modifiers').values()].flatMap(e=>{const m=models.get(e.id);return m&&m.sourceId===id?[m]:[]})}
+    range.onQueue=(name,m)=>this.entities!.queue(name,m,'archerRange')
+    range.onRemove=m=>this.entities!.remove(m)
+    this.archerPierceStun.present=firebook.present
+    this.archerPierceStun.onQueue=m=>this.entities!.queue(m.key,m,'archerPierceStun')
+    this.archerPierceStun.onRemove=m=>this.entities!.remove(m)
+    this.combat.archerPierceRays.onQueue=m=>this.entities!.queue(m.name,m,'archerPierceRay')
+    this.combat.archerPierceRays.onRemove=m=>this.entities!.remove(m)
     this.archerMark.present=firebook.present
     this.archerMark.candidates=e=>[...this.entities!.modifiersFor(e)].filter(b=>b.kind==='archerMark').map(b=>b.model as ArcherMark)
     this.archerMark.onQueue=m=>this.entities!.queue('mod_archers_skill_c_weak',m,'archerMark')
     this.archerMark.onRemove=m=>this.entities!.remove(m)
     this.combat.deferProjectileInsertSound=true
+    this.combat.deferEffectInsertSound=true
     this.heroes.ranged.deferProjectileInsertSound=true
     this.barracks.onRemoveModifiers=s=>{for(const b of this.entities!.bindingsInOrder()){const m=b.model as {target?:SoldierInstance};if(m.target===s&&this.entities!.entity(b.model)?.modifier)this.entities!.remove(b.model)}}
     this.heroes.nativeLifeEnabled=true
@@ -428,18 +511,34 @@ export class GameSession {
       const candidates=global?[...this.entities!.persistent.get('alive_enemies').values()].flatMap(e=>{const model=byId.get(e.id);return model?[model]:[]}):this.combat.enemyCandidates(this.enemies,pos,range)
       return candidates.filter(e=>e.hp>0&&e.escapedAt===undefined&&(global||(e.path.position.x-pos.x)**2+(e.path.position.y-pos.y)**2/(.7*.7)<=range*range))
     }
+    this.combat.culverineTowers.native=true
+    const culverine=this.combat.nativeCulverine
+    culverine.id=m=>this.entities!.entity(m)?.id
+    culverine.present=m=>{const e=this.entities!.entity(m);return !!e&&!!this.entities!.registry.entities.get(e.id)}
+    culverine.onQueue=m=>this.entities!.queue(m.name,m,'culverineNative')
+    culverine.onRemove=m=>this.entities!.remove(m)
     this.powers.deferRain=this.powers.deferReinforcements=true
     this.entities.onModelInsert=(model,kind)=>{
+      if(kind==='scene'&&this.nativeEffects.includes(model as (typeof this.nativeEffects)[number])){const sound=this.templates[(model as (typeof this.nativeEffects)[number]).name].sound_events?.insert;if(sound)this.onSound(sound)}
+      if(kind==='culverineNative'){this.entities!.setTween(model,t=>culverine.tween(model as import('./CulverineNativeRuntime').NativeCulverineModel,t));return culverine.insert(model as import('./CulverineNativeRuntime').NativeCulverineModel)}
       if(kind==='enemyTeleport')return teleport.insert(model as import('./EnemyTeleportRuntime').NativeTeleport,this.time)
-      if(kind==='heroProjectile'){const sound=this.templates[(model as HeroProjectile).name].sound_events?.insert;if(sound)this.onSound(sound)}
+      if(kind==='heroProjectile'){const p=model as HeroProjectile,id=this.entities!.entity(p.target)?.id;if(!this.heroes.ranged.insertProjectile(p,this.time,id!==undefined&&!!this.entities!.registry.entities.get(id)))return false;const sound=this.templates[p.name].sound_events?.insert;if(sound)this.onSound(sound);return true}
       if(kind==='enemy'){const e=model as EnemyInstance;if(e.template.ranged)for(const a of e.template.ranged.attacks)if(a.max_range_variance!==undefined)a.max_range+=Math.floor(this.random()*(a.max_range_variance+1))}
       if(kind==='soldier'){
         const soldier=model as SoldierInstance
-        this.barracks.initializeKnightInsert(soldier,this.time);this.barracks.initializeReinforcementInsert(soldier)
+        this.knightArmor.insertSoldier(soldier);this.barracks.initializeKnightInsert(soldier,this.time);this.knightHeal.insertSoldier(soldier);this.knightLegacy.insertSoldier(soldier);this.barracks.initializeReinforcementInsert(soldier)
         this.entities!.setTween(model,t=>{if(soldier.name==='soldier_reinforcement_base')this.barracks.advanceReinforcementTween(soldier,t);this.barracks.advanceCorpseTween(soldier,t)})
       }
       if(kind==='heroLife')this.entities!.setTween(model,t=>this.heroes.life.tween(model as import('./HeroLifeRuntime').HeroTombstone,t))
       if(kind==='firebookBurn')return firebook.insert(model as import('./FirebookBurnRuntime').NativeFirebookBurn,this.time)
+      if(kind==='reinforcementSpecial'){const m=model as ReinforcementSpecialModel;if(m.kind==='armor')this.entities!.setTween(m,time=>this.reinforcementSpecial.tween(m,time));return this.reinforcementSpecial.insert(m,this.time)}
+      if(kind==='knightLegacyAura')return this.knightLegacy.insert(model as KnightLegacyAura)
+      if(kind==='knightLegacyStun')return this.knightLegacy.stuns.insert(model as ArcherPierceStun,this.time)
+      if(kind==='knightArmor'){const m=model as KnightArmorAura;this.entities!.setTween(m,t=>this.knightArmor.tween(m,t));return this.knightArmor.insert(m)}
+      if(kind==='wizardEmpower'){const m=model as import('./WizardEmpowerRuntime').NativeEmpowerModel;this.entities!.setTween(m,t=>empower.tween(m,t));return empower.insert(m,this.time)}
+      if(kind==='archerRange'){const m=model as NativeRangeModel;this.entities!.setTween(m,t=>range.tween(m,t));return range.insert(m,this.time)}
+      if(kind==='archerPierceRay')return this.combat.archerPierceRays.insert(model as ArcherPierceRay)
+      if(kind==='archerPierceStun')return this.archerPierceStun.insert(model as ArcherPierceStun,this.time)
       if(kind==='archerMark')return this.archerMark.insert(model as ArcherMark,this.time)
       if(kind==='enemyArrow')return this.enemyRanged.runtime.insertArrow(model as import('./EnemyRangedRuntime').NativeEnemyArrow,this.time)
       if(kind==='enemyArrowEffect'){const m=model as import('./EnemyRangedRuntime').EnemyArrowEffect;this.enemyRanged.runtime.insertEffect(m);if(m.kind==='miss')this.entities!.setTween(m,t=>this.enemyRanged.runtime.tween(m,t))}
@@ -459,7 +558,7 @@ export class GameSession {
       if(kind==='copyAura'){this.wizardCopies.insertAura(model as WizardCopiesAura);this.entities!.setTween(model,time=>this.wizardCopies.tween(model as WizardCopiesAura,time))}
       if(kind==='projectile'){const sound=this.combat.pendingProjectileInsertSound(model,this.enemies);if(sound)this.onSound(sound);return this.combat.insertArrow(model,this.time,this.enemies)}
     }
-    this.entities.onModelRemove=(model,kind,template)=>{if(kind==='archerMark')return this.archerMark.remove(model as ArcherMark);if(kind==='copyAura')this.wizardCopies.removeAura(model as WizardCopiesAura);if(kind==='firebookBurn')return firebook.remove(model as import('./FirebookBurnRuntime').NativeFirebookBurn);if(kind==='enemyTeleport')return teleport.remove(model as import('./EnemyTeleportRuntime').NativeTeleport);if(kind==='heroLife')this.heroes.life.remove(model as import('./HeroLifeRuntime').HeroTombstone);if(kind==='enemyArrow')this.enemyRanged.runtime.removeArrow(model as import('./EnemyRangedRuntime').NativeEnemyArrow);if(kind==='enemyArrowEffect')this.enemyRanged.runtime.removeEffect(model as import('./EnemyRangedRuntime').EnemyArrowEffect);if(kind==='zefiraHammer')return this.heroes.zefiraSkills.nativeHammer.remove(model as import('./ZefiraHammerRuntime').HammerModel);if(kind==='geraldModifier')return this.heroes.geraldSkills.nativeModifiers.remove(model as import('./GeraldModifierRuntime').NativeGeraldModifier);if(kind==='zefiraShield')return this.heroes.zefiraSkills.nativeShield.remove(model as import('./ZefiraShieldRuntime').ZefiraShieldModel);if(kind==='soldier'){const i=this.barracks.soldiers.indexOf(model as SoldierInstance);if(i>=0)this.barracks.soldiers.splice(i,1)}if(kind==='smoke')return this.enemySkills.runtime.remove(model as import('./SmokeRuntime').SmokeModel,this.time);if(kind==='enemy'){this.enemyRanged.runtime.removeEnemy(model as EnemyInstance);const i=this.enemies.indexOf(model as EnemyInstance);if(i>=0)this.enemies.splice(i,1)}if(kind==='royal')return this.powers.royal.runtime.remove(model as import('./RoyalRuntime').RoyalModel,this.time);if(kind==='tower'&&template.startsWith('tower_archers_'))this.combat.removeArcherControllers(model as TowerSite,template)}
+    this.entities.onModelRemove=(model,kind,template,removedId)=>{if(kind==='culverineNative')return culverine.remove(model as import('./CulverineNativeRuntime').NativeCulverineModel,this.time);if(kind==='reinforcementSpecial')return this.reinforcementSpecial.remove(model as ReinforcementSpecialModel,this.time);if(kind==='knightLegacyAura')return this.knightLegacy.remove(model as KnightLegacyAura);if(kind==='knightLegacyStun')return this.knightLegacy.stuns.remove(model as ArcherPierceStun);if(kind==='tower'&&removedId!==undefined){const roster=this.soldKnightRosters.get(removedId);if(roster){for(const soldier of roster)this.entities!.remove(soldier);this.soldKnightRosters.delete(removedId)}}if(kind==='knightArmor')return this.knightArmor.remove(model as KnightArmorAura);if(kind==='wizardEmpower')return empower.remove(model as import('./WizardEmpowerRuntime').NativeEmpowerModel,this.time);if(kind==='archerRange')return range.remove(model as NativeRangeModel);if(kind==='archerPierceRay')return this.combat.archerPierceRays.remove(model as ArcherPierceRay);if(kind==='archerPierceStun')return this.archerPierceStun.remove(model as ArcherPierceStun);if(kind==='archerMark')return this.archerMark.remove(model as ArcherMark);if(kind==='copyAura')this.wizardCopies.removeAura(model as WizardCopiesAura);if(kind==='firebookBurn')return firebook.remove(model as import('./FirebookBurnRuntime').NativeFirebookBurn);if(kind==='enemyTeleport')return teleport.remove(model as import('./EnemyTeleportRuntime').NativeTeleport);if(kind==='heroLife')this.heroes.life.remove(model as import('./HeroLifeRuntime').HeroTombstone);if(kind==='enemyArrow')this.enemyRanged.runtime.removeArrow(model as import('./EnemyRangedRuntime').NativeEnemyArrow);if(kind==='enemyArrowEffect')this.enemyRanged.runtime.removeEffect(model as import('./EnemyRangedRuntime').EnemyArrowEffect);if(kind==='zefiraHammer')return this.heroes.zefiraSkills.nativeHammer.remove(model as import('./ZefiraHammerRuntime').HammerModel);if(kind==='geraldModifier')return this.heroes.geraldSkills.nativeModifiers.remove(model as import('./GeraldModifierRuntime').NativeGeraldModifier);if(kind==='zefiraShield')return this.heroes.zefiraSkills.nativeShield.remove(model as import('./ZefiraShieldRuntime').ZefiraShieldModel);if(kind==='soldier'){const i=this.barracks.soldiers.indexOf(model as SoldierInstance);if(i>=0)this.barracks.soldiers.splice(i,1)}if(kind==='smoke')return this.enemySkills.runtime.remove(model as import('./SmokeRuntime').SmokeModel,this.time);if(kind==='enemy'){this.enemyRanged.runtime.removeEnemy(model as EnemyInstance);const i=this.enemies.indexOf(model as EnemyInstance);if(i>=0)this.enemies.splice(i,1)}if(kind==='royal')return this.powers.royal.runtime.remove(model as import('./RoyalRuntime').RoyalModel,this.time);if(kind==='tower'&&template.startsWith('tower_archers_')){this.combat.removeArcherControllers(model as TowerSite,template);if(template==='tower_archers_lvl4')range.removeSource(model as TowerSite,removedId)}}
     for(const h of this.heroes.team)this.entities.bindInitial(h,h.name,'hero')
     for(const e of this.enemies)this.entities.bindInitial(e,e.name,'enemy')
     this.entities.bindInitial(this.backgroundSounds,'background_sounds_kr5','scene')
@@ -469,7 +568,9 @@ export class GameSession {
     this.fishing.onCreate=e=>this.entities!.queue(e.template,e)
     this.fishing.onRemove=e=>this.entities!.remove(e)
     this.buyAvailable.sitesInOrder=()=>[...this.entities!.persistent.get('towers').values()].filter(e=>!e.pending_removal).flatMap(e=>{const site=this.towers.sites.find(s=>this.entities!.entity(s)===e);return site?[site]:[]})
-    this.entities.onTowerReplace=(site,id)=>{const indicator=this.buyAvailable.indicators.get(site.id);if(indicator)indicator.targetId=id}
+    this.entities.onTowerReplace=(site,id)=>{if(site.tower){range.retarget(site,id);empower.retarget(site,id);}const indicator=this.buyAvailable.indicators.get(site.id);if(indicator)indicator.targetId=id}
+    this.buyAvailable.targetPresent=state=>state.targetId!==undefined&&!!this.entities!.registry.entities.get(state.targetId)
+    this.buyAvailable.onRemove=state=>this.entities!.remove(state)
     this.buyAvailable.onCreate=site=>{const indicator=this.buyAvailable.indicators.get(site.id)!;indicator.targetId=this.entities!.entity(site)?.id;this.entities!.queue('mod_buy_available',indicator)}
   }
   get incomingWave(){if(this.pendingWaveCall)return;const incoming=this.waves.nextWave;if(!incoming)return;return {...incoming,flyingPaths:[...new Set(incoming.spawns.filter(s=>this.templates[s.enemy].vis.flags&128).map(s=>s.pi))]}}
@@ -574,9 +675,18 @@ export class GameSession {
     if(this.entities){
       this.combat.advance(this.time,this.towers.sites,this.enemies,(advanceSource,advanceProjectile)=>{
         for(const binding of this.entities!.mainBindings()){
-          if(binding.kind==='copyBounce')this.wizardCopies.advanceBounce(binding.model as WizardCopiesBounce,this.time)
+          if(binding.kind==='culverineNative')this.combat.nativeCulverine.advance(binding.model as import('./CulverineNativeRuntime').NativeCulverineModel,this.time)
+          else if(binding.kind==='copyBounce')this.wizardCopies.advanceBounce(binding.model as WizardCopiesBounce,this.time)
           else if(binding.kind==='copyAura')this.wizardCopies.advanceAura(binding.model as WizardCopiesAura,this.time)
           else if(binding.kind==='firebookBurn')this.combat.firebook.runtime.advance(binding.model as import('./FirebookBurnRuntime').NativeFirebookBurn,this.time)
+          else if(binding.kind==='reinforcementSpecial')this.reinforcementSpecial.advance(binding.model as ReinforcementSpecialModel,this.time)
+          else if(binding.kind==='knightLegacyAura')this.knightLegacy.advance(binding.model as KnightLegacyAura,this.time)
+          else if(binding.kind==='knightLegacyStun')this.knightLegacy.stuns.advance(binding.model as ArcherPierceStun,this.time)
+          else if(binding.kind==='knightArmor')this.knightArmor.advance(binding.model as KnightArmorAura,this.time)
+          else if(binding.kind==='wizardEmpower')this.wizardEmpower.runtime.advance(binding.model as import('./WizardEmpowerRuntime').NativeEmpowerModel,this.time)
+          else if(binding.kind==='archerRange')this.archerRange.runtime.advance(binding.model as NativeRangeModel,this.time)
+          else if(binding.kind==='archerPierceRay')this.combat.archerPierceRays.advance(binding.model as ArcherPierceRay,this.time,this.enemies)
+          else if(binding.kind==='archerPierceStun')this.archerPierceStun.advance(binding.model as ArcherPierceStun,this.time)
           else if(binding.kind==='archerMark')this.archerMark.advance(binding.model as ArcherMark,this.time)
           else if(binding.kind==='enemyTeleport')this.enemyTeleports.runtime.advance(binding.model as import('./EnemyTeleportRuntime').NativeTeleport,this.time)
           else if(binding.kind==='ambient')this.creatures.advanceOne(binding.model as import('./AmbientCreatures').AmbientCreature,this.time)
@@ -595,7 +705,7 @@ export class GameSession {
           else if(binding.kind==='hero'){
             const lifeHero=binding.model as import('./HeroSystem').HeroUnit
             if(lifeHero.name==='hero_gerald')this.heroes.survivor.beginNativeMain(this.time)
-            if(lifeHero.nativeHeroLife&&(lifeHero.hp<=0||lifeHero.name==='hero_gerald'&&this.heroes.survivor.active)){if(lifeHero.deathContinuation&&!(lifeHero.name==='hero_gerald'&&this.heroes.survivor.active)){lifeHero.deathContinuation=false;this.barracks.interruptHeroMelee(lifeHero);if(this.heroes.ranged.resumeDeath(lifeHero,this.time)){this.barracks.finishHeroRangedMain(lifeHero,this.time,dt);this.barracks.finishHeroIdle(lifeHero,this.time,dt)}if(lifeHero.name==='hero_zefira')this.heroes.zefiraSkills.nativeHammer.advanceCast(this.time);else this.heroes.geraldSkills.advance(this.time,lifeHero,this.barracks.soldiers,false);continue}if(lifeHero.name==='hero_gerald'&&this.heroes.survivor.advanceNative(this.time,lifeHero,this.heroes.geraldRallyPending))continue;if(this.heroes.life.advance(lifeHero,this.time))continue;this.heroes.advanceHeroGrowth(this.time,lifeHero)}
+            if(lifeHero.nativeHeroLife&&(lifeHero.hp<=0||lifeHero.name==='hero_gerald'&&this.heroes.survivor.active)){if(lifeHero.deathContinuation&&!(lifeHero.name==='hero_gerald'&&this.heroes.survivor.active)){lifeHero.deathContinuation=false;this.barracks.resumeHeroMeleeDeath(lifeHero,this.time);if(this.heroes.ranged.resumeDeath(lifeHero,this.time)){this.barracks.finishHeroRangedMain(lifeHero,this.time,dt);this.barracks.finishHeroIdle(lifeHero,this.time,dt)}if(lifeHero.name==='hero_zefira')this.heroes.zefiraSkills.nativeHammer.advanceCast(this.time);else this.heroes.geraldSkills.advance(this.time,lifeHero,this.barracks.soldiers,false);continue}if(lifeHero.name==='hero_gerald'&&this.heroes.survivor.advanceNative(this.time,lifeHero,this.heroes.geraldRallyPending))continue;if(this.heroes.life.advance(lifeHero,this.time))continue;this.heroes.advanceHeroGrowth(this.time,lifeHero)}
             if((binding.model as import('./HeroSystem').HeroUnit).name==='hero_gerald'&&this.heroes.prepareGeraldRally(this.time))continue
             const rallyHero=binding.model as import('./HeroSystem').HeroUnit
             if(rallyHero.name==='hero_gerald'&&rallyHero.deploying){if(this.barracks.advanceGeraldRally(rallyHero,this.time,dt))continue;this.heroes.advanceGeraldGrowth(this.time)}
@@ -641,12 +751,13 @@ export class GameSession {
       this.combat.firebookTrails.prepare(this.time);this.heroes.ranged.trails.prepare(this.time);this.powers.rainTrails.prepare(this.time)
       for(const b of this.entities.bindingsInOrder('particle')){const t=b.model as import('./FirebookTrail').FirebookTrail;if(t.kind==='rain')this.powers.rainTrails.advanceOne(t,this.time,this.powers.meteors);else if(t.kind==='zefira')this.heroes.ranged.trails.advanceOne(t,this.time,this.heroes.ranged.projectiles.map(p=>({id:p.id,pos:p.pos,rotation:p.particleRotation??0})));else this.combat.firebookTrails.advanceOne(t,this.time,this.combat.projectiles)}
     }else this.combat.advanceParticles(this.time)
-    let alive=this.pendingEnemies.length>0||this.enemies.some(e=>e.hp>0 && e.escapedAt===undefined)
-    if(this.hadEnemies && !alive){this.waves.signal('all_enemies_died');this.onCommand({name:'signal',signal_name:'all_enemies_died'});alive=this.pendingEnemies.length>0||this.enemies.some(e=>e.hp>0 && e.escapedAt===undefined)}
+    let alive=this.pendingEnemies.length>0||this.enemies.some(e=>e.hp>0 && e.diedAt===undefined && e.escapedAt===undefined)
+    if(this.hadEnemies && !alive){this.waves.signal('all_enemies_died');this.onCommand({name:'signal',signal_name:'all_enemies_died'});alive=this.pendingEnemies.length>0||this.enemies.some(e=>e.hp>0 && e.diedAt===undefined && e.escapedAt===undefined)}
     this.hadEnemies=alive
     if(this.stageFlow)this.levelScriptComplete=this.stageFlow.advance(this.time,this.waves.finished,alive,this.waves.manualFinished('tutorial'))
 
     if(this.outcome?.kind==='defeat'){this.paused=true;this.onSound('GUIStageDefeat')}
+    this.healthBars.advance(this)
     this.paintOrder.advance(this)
     this.stepping=false
   }

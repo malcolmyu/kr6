@@ -1,3 +1,4 @@
+import {soldierIsDead} from './SoldierHealth.ts'
 import {EnemyRangedRuntime} from './EnemyRangedRuntime.ts'
 import type {EnemyArrowEffect} from './EnemyRangedRuntime'
 import {DodgeSystem} from './DodgeSystem.ts'
@@ -14,7 +15,7 @@ interface RangedCycle {startedAt:number;target:SoldierInstance;fired:boolean;att
 export interface EnemyRangedState {readyAt:number;target?:SoldierInstance;cycle?:RangedCycle;facingLeft:boolean;animationAt:number;holding:boolean}
 export interface EnemyArrow {id:number;name:string;born:number;pos:Point;to:Point;rotation:number;hidden:boolean;motion:EnemyArrowMotion;target:SoldierInstance}
 export function canEnemyRange(enemy:EnemyInstance,soldier:SoldierInstance,attack:EnemyRangedAttack){
- if(enemy.hp<=0||soldier.hp<=0||enemy.escapedAt!==undefined)return false
+ if(enemy.hp<=0||soldierIsDead(soldier)||enemy.escapedAt!==undefined)return false
  const vis=soldier.template.vis??{flags:1025,bans:0};if(vis.bans&attack.vis_flags||vis.flags&attack.vis_bans)return false
  const dx=soldier.pos.x-enemy.path.position.x,dy=soldier.pos.y-enemy.path.position.y,aspect2=.7*.7,d=aspect2*dx*dx+dy*dy
  return d<=attack.max_range*attack.max_range*aspect2 && (attack.min_range===0||d>attack.min_range*attack.min_range*aspect2)
@@ -63,7 +64,7 @@ export class EnemyRangedCombat {
    const done=p.motion.step(time-p.born,dt,hit);p.pos=p.motion.pos;p.rotation=p.motion.rotation;p.hidden=p.motion.hidden
    if(!done)continue
    const b=this.templates[p.name].bullet
-   const valid=soldiers.includes(target)&&target.hp>0,close=valid&&Math.hypot(p.pos.x-hit.x,p.pos.y-hit.y)<b.hit_distance
+   const valid=soldiers.includes(target)&&!soldierIsDead(target),close=valid&&Math.hypot(p.pos.x-hit.x,p.pos.y-hit.y)<b.hit_distance
    const dodged=close&&this.dodges.check(target,time,true)
    if(close&&!dodged){
     const raw=bulletDamageValue(b.damage_min,b.damage_max,b.damage_factor,this.random)

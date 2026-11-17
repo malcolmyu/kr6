@@ -1,3 +1,6 @@
+import {CulverineNativeRenderer} from './CulverineNativeRenderer'
+import {ReinforcementSpecialRenderer} from './ReinforcementSpecialRenderer'
+import {KnightArmorRenderer} from './KnightArmorRenderer'
 import {ArcherMarkRenderer} from './ArcherMarkRenderer'
 import {WizardCopiesRenderer} from './WizardCopiesRenderer'
 import {HeroLifeRenderer} from './HeroLifeRenderer'
@@ -42,6 +45,9 @@ export class WorldRenderer {
   sessionRandom:()=>number=Math.random
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
+  private culverineNativeRenderer?:CulverineNativeRenderer
+  private reinforcementSpecialRenderer?:ReinforcementSpecialRenderer
+  private knightArmorRenderer?:KnightArmorRenderer
   private wizardEmpowerRenderer?:WizardEmpowerRenderer
   private archerRangeRenderer?:ArcherRangeRenderer
   private royalRenderer?:RoyalEdictRenderer
@@ -197,8 +203,11 @@ export class WorldRenderer {
     this.catapultTrapsRenderer=new CatapultTrapsRenderer(this.scene,this.towerAtlas,towerArt.animations)
     this.heroLifeRenderer=new HeroLifeRenderer(this.scene,this.towerAtlas,towerArt.exos)
     this.zefiraSkillsRenderer=new ZefiraSkillsRenderer(this.scene,this.towerAtlas,towerArt.exos,towerArt.animations)
+    this.culverineNativeRenderer=new CulverineNativeRenderer(this.scene,this.towerAtlas,towerArt.animations,templates)
+    this.reinforcementSpecialRenderer=new ReinforcementSpecialRenderer(this.scene,this.towerAtlas,towerArt.animations,templates)
+    this.knightArmorRenderer=new KnightArmorRenderer(this.scene,this.towerAtlas)
     this.wizardEmpowerRenderer=new WizardEmpowerRenderer(this.scene,this.towerAtlas,towerArt.exos,templates)
-    this.archerRangeRenderer=new ArcherRangeRenderer(this.scene,this.towerAtlas,towerArt.exos)
+    this.archerRangeRenderer=new ArcherRangeRenderer(this.scene,this.towerAtlas,towerArt.exos,this.templates)
     this.archerMarkRenderer=new ArcherMarkRenderer(this.scene,this.towerAtlas,towerArt.exos.archer_markDef,templates.mod_archers_skill_c_weak.render.sprites[0])
     this.copiesRenderer=new WizardCopiesRenderer(this.scene,this.towerAtlas,this.towerArt!.animations,templates.aura_wizard_skill_c.render.sprites[0])
     this.firebookRenderer=new WizardFirebookRenderer(this.scene,this.towerAtlas,this.towerArt!.animations,templates.mod_firebook_aura.render.sprites[0])
@@ -292,6 +301,9 @@ export class WorldRenderer {
       this.catapultTarRenderer?.advance(session)
       this.catapultTrapsRenderer?.advance(session)
       this.archerRangeRenderer?.advance(session)
+      this.culverineNativeRenderer?.advance(session)
+      this.reinforcementSpecialRenderer?.advance(session)
+      this.knightArmorRenderer?.advance(session)
       this.wizardEmpowerRenderer?.advance(session)
       this.royalRenderer?.advance(session)
       this.zefiraSkillsRenderer?.advance(session)
@@ -321,13 +333,13 @@ export class WorldRenderer {
         let sprite=this.sprites.get(enemy.id)
         if(!sprite) { sprite=this.atlas.create();this.sprites.set(enemy.id,sprite);this.scene.add(sprite.root) }
         const config=enemy.template.render.sprites[0]
-        if(enemy.escapedAt!==undefined||enemy.teleportHidden){sprite.root.visible=false;continue}
+        if(enemy.escapedAt!==undefined&&!session.entities||enemy.teleportHidden){sprite.root.visible=false;continue}
         sprite.root.visible=!enemy.deathHidden
         sprite.setOpacity((enemy.corpseAlpha??255)/255)
         if(enemy.deathHidden)continue
         sprite.root.position.set(enemy.path.position.x+config.offset.x,enemy.path.position.y+config.offset.y,1)
         sprite.setOrder(...this.nativeOrder(config,enemy.path.position,session.entities?.entity(enemy)?.id??enemy.id))
-        if(enemy.diedAt!==undefined&&!enemy.deathManaged) {
+        if(enemy.diedAt!==undefined&&!enemy.deathManaged&&!enemy.visualOverride) {
           const death=this.animations[`${config.prefix}_death`]
           const elapsed=session.time-enemy.diedAt
           sprite.root.visible=elapsed<enemy.template.health.dead_lifetime
@@ -370,7 +382,7 @@ export class WorldRenderer {
     }
     for(const e of session.enemies){
       const shadow=e.template.render.sprites[1]
-      if(shadow?.name&&!e.teleportHidden&&(e.hp>0||e.name==='enemy_crow'&&e.deathStartedAt===undefined)&&e.escapedAt===undefined){
+      if(shadow?.name&&!e.teleportHidden&&(e.hp>0||e.name==='enemy_crow'&&e.deathStartedAt===undefined)&&(e.escapedAt===undefined||!!session.entities)){
         shadows.add(e.id);let art=this.enemyShadows.get(e.id);if(!art){art=this.towerAtlas.create();this.scene.add(art.root);this.enemyShadows.set(e.id,art)}
         art.setFrame(shadow.name,shadow.anchor);art.root.position.set(e.path.position.x+shadow.offset.x,e.path.position.y+shadow.offset.y,1);art.root.scale.set(shadow.scale?.x??1,shadow.scale?.y??1,1);art.setOrder(...this.nativeOrder(shadow,e.path.position,session.entities?.entity(e)?.id??e.id,2))
       }
@@ -430,7 +442,7 @@ export class WorldRenderer {
           }
           if(site.tower?.startsWith('tower_culverine_')){
             const sid=this.templates[key].render.sprites.indexOf(config),part=this.session.combat.culverineTowers.states.get(site.id)?.parts[sid]
-            if(part){const pose={...part};rendered.update=time=>{art.root.visible=!pose.hidden;art.root.scale.x=pose.flip?-1:1;art.animate(pose.name,time-pose.ts,pose.loop)};rendered.update(this.session.time)}else art.animate(config.name,elapsed)
+            if(part){const pose={...part};rendered.update=time=>{art.root.visible=!pose.hidden;art.root.scale.x=pose.flip?-1:1;art.animate(pose.name,time-pose.ts,pose.loop,30)};rendered.update(this.session.time)}else art.animate(config.name,elapsed,true,30)
             continue
           }
           if(site.tower?.startsWith('tower_wizard_')){
@@ -443,7 +455,7 @@ export class WorldRenderer {
             const template=this.templates[key] as TowerTemplate&{shooters_sids:number[];bows_sids?:number[]}
             const sid=template.render.sprites.indexOf(config)+1,bowIndex=template.bows_sids?.indexOf(sid)??-1
             const shooterSid=bowIndex>=0?template.shooters_sids[bowIndex]:sid,controller=state?.archers?.get(shooterSid)
-            if(controller){const pose={...controller},name=pose.animation+(pose.back?'back':'');rendered.update=time=>{art.root.visible=bowIndex<0||!pose.back;art.root.scale.x=pose.flipX?-1:1;if(art.root.visible)art.animate(name,time-pose.startedAt,pose.loop,config.fps??30)};rendered.update(this.session.time)}
+            if(controller){const pose={...(bowIndex>=0&&controller.bowPose?controller.bowPose:controller)},name=pose.animation+(pose.back&&pose.animation!=='stun'?'back':'');rendered.update=time=>{art.root.visible=bowIndex<0||!pose.back;art.root.scale.x=pose.flipX?-1:1;if(art.root.visible)art.animate(name,time-pose.startedAt,pose.loop,config.fps??30)};rendered.update(this.session.time)}
             else art.animate(config.name,elapsed)
             continue
           }
@@ -562,7 +574,7 @@ export class WorldRenderer {
   private renderProjectiles() {
     if(!this.session || !this.towerAtlas || !this.towerArt)return
     const live=new Set<number>()
-    for(const projectile of [...this.session.combat.projectiles,...this.session.heroes.projectiles,...this.session.enemyRanged.projectiles,...this.session.combat.culverineRays.rays.filter(r=>!r.removed)]) {
+    for(const projectile of [...this.session.combat.projectiles,...this.session.heroes.projectiles,...this.session.enemyRanged.projectiles,...this.session.combat.culverineRays.rays.filter(r=>!r.removed),...this.session.combat.archerPierceRays.rays,...this.session.combat.nativeCulverine.rays]) {
       if(projectile.born===undefined)continue
       live.add(projectile.id)
       let art=this.projectileSprites.get(projectile.id)
@@ -570,7 +582,8 @@ export class WorldRenderer {
       if(!art) {art=config.exo?new ExoSprite(this.towerAtlas,this.towerArt.exos[config.prefix!]):this.towerAtlas.create();this.projectileSprites.set(projectile.id,art);this.scene.add(art.root)}
       const elapsed=this.session.time-projectile.born
       if(art instanceof ExoSprite)art.animate(config.name,elapsed)
-      else if(config.prefix){const a=this.towerArt.animations[`${config.prefix}_${config.name}`];if(projectile.name.startsWith('bullet_skill_c_wizard_')){const frame=nativeAnimationFrame(a.to-a.from+1,this.session.time-(config.ts??0),config.loop??true,config.fps??30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,config.anchor)}else art.animate(a,elapsed,30,config.anchor)}
+      else if(config.prefix){const a=this.towerArt.animations[`${config.prefix}_${config.name}`];if(projectile.name.startsWith('bullet_culverine_')){const frame=nativeAnimationFrame(a.to-a.from+1,elapsed,config.loop??true,config.fps??30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,config.anchor)}else if(projectile.name.startsWith('bullet_skill_c_wizard_')){const frame=nativeAnimationFrame(a.to-a.from+1,this.session.time-(config.ts??0),config.loop??true,config.fps??30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,config.anchor)}else art.animate(a,elapsed,30,config.anchor)}
+      else if(config.animated&&this.towerArt.animations[config.name]){const a=this.towerArt.animations[config.name],frame=nativeAnimationFrame(a.to-a.from+1,elapsed,config.loop??true,config.fps??30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,config.anchor)}
       else art.setFrame(config.name,config.anchor)
       art.root.visible=!('hidden'in projectile&&projectile.hidden)&&!('bombMotion'in projectile&&projectile.bombMotion?.hidden)&&!('arrowMotion'in projectile&&projectile.arrowMotion?.hidden)
       art.root.position.set(projectile.pos.x,projectile.pos.y,2)
@@ -585,6 +598,9 @@ export class WorldRenderer {
     this.catapultTrapsRenderer?.dispose();this.catapultTrapsRenderer=undefined
     this.catapultTarRenderer?.dispose();this.catapultTarRenderer=undefined
     this.catapultBombRenderer?.dispose();this.catapultBombRenderer=undefined
+    this.culverineNativeRenderer?.dispose();this.culverineNativeRenderer=undefined
+    this.reinforcementSpecialRenderer?.dispose();this.reinforcementSpecialRenderer=undefined
+    this.knightArmorRenderer?.dispose();this.knightArmorRenderer=undefined
     this.wizardEmpowerRenderer?.dispose();this.wizardEmpowerRenderer=undefined
     this.archerRangeRenderer?.dispose();this.archerRangeRenderer=undefined
     this.zefiraSkillsRenderer?.dispose();this.zefiraSkillsRenderer=undefined

@@ -1,6 +1,7 @@
+import {CulverineNativeRuntime} from './CulverineNativeRuntime.ts'
 import {nativeLogicAnimationFrame} from './NativeAnimation.ts'
 import {luaSort} from './LuaSort.ts'
-import {recordEnemyDamage} from './EnemyDeath.ts'
+import {recordEnemyDamage,enemyIsDead} from './EnemyDeath.ts'
 import {FirebookTrailSystem} from './FirebookTrail.ts'
 import {WizardFirebookSystem} from './WizardFirebook.ts'
 import {CatapultTraps,catapultOwner} from './CatapultTraps.ts'
@@ -10,6 +11,8 @@ import wizardTimes from '../../public/data/wizard-exo-times.json' with {type:'js
 import {CatapultTowerSystem,catapultDirection} from './CatapultTower.ts'
 import {WizardTowerSystem} from './WizardTower.ts'
 import {archerGeometry} from './ArcherShooter.ts'
+import {ArcherPierceCaster} from './ArcherPierceCaster.ts'
+import {ArcherPierceRaySystem} from './ArcherPierceRay.ts'
 import {ArcherMarkCaster} from './ArcherMarkCaster.ts'
 import {CulverineRaySystem} from './CulverineRay.ts'
 import {CulverineTowerSystem} from './CulverineTower.ts'
@@ -43,8 +46,11 @@ export interface Projectile {registryBound?:boolean;removalQueued?:boolean;nativ
 export interface ShootingState {readyAt:number;startedAt:number;firesAt?:number;target?:EnemyInstance;facingBack:boolean;archerTs?:number;shooterIndex?:number;archers?:Map<number,ArcherState>}
 interface ArrowShot {name:string;from:Point;to:Point;target:EnemyInstance;predict:boolean;factor:number;reduceArmor:number;queuedAt:number}
 export class RangedCombat {
+  onArcherPowerUpdates:(site:TowerSite,time:number)=>void=()=>{}
+  onArcherRangeMain:(site:TowerSite,time:number)=>boolean=()=>false
   deferArcherControllers=false
   deferProjectileInsertSound=false
+  deferEffectInsertSound=false
   readonly archerControllers=new Set<ArcherState>()
   onQueueArcherController:(controller:ArcherState)=>void=()=>{}
   onRemoveArcherController:(controller:ArcherState)=>void=()=>{}
@@ -68,6 +74,7 @@ export class RangedCombat {
   cellAt:(point:Point)=>number=()=>1
   onEffect:(name:string,pos:Point,time:number,transform?:{flipX?:boolean;rotation?:number;bloodColor?:string;animationName?:string})=>void=()=>{}
   readonly projectiles:Projectile[]=[]
+  readonly nativeCulverine:CulverineNativeRuntime
   readonly culverineRays:CulverineRaySystem
   readonly culverineTowers:CulverineTowerSystem
   readonly wizardTowers:WizardTowerSystem
@@ -82,15 +89,23 @@ export class RangedCombat {
   private pendingWizardShots:{name:string;from:Point;to:Point;targetId?:number;factor:number;sign:number;plain?:boolean;damageMin?:number;damageMax?:number}[]=[]
   private pendingCatapultShots:{source?:string;name:string;from:Point;to:Point;factor:number;level:number;damageMin?:number;damageMax?:number}[]=[]
   readonly shooters=new Map<string,ShootingState>()
+  readonly archerPierceCaster?:ArcherPierceCaster
+  readonly archerPierceRays:ArcherPierceRaySystem
   readonly archerMarkCaster?:ArcherMarkCaster
   readonly damageOverrides=new Map<string,number>()
   readonly bulletOverrides=new Map<string,string>()
+  private currentEnemies:EnemyInstance[]=[]
   private nextId=1
   private templates:Record<string,CombatTemplate>
   private random:()=>number
   private onKill:(enemy:EnemyInstance)=>void
   constructor(templates:Record<string,CombatTemplate>,random:()=>number,onKill:(enemy:EnemyInstance)=>void) {
     this.templates=templates;this.random=random;this.onKill=onKill
+    this.archerPierceRays=new ArcherPierceRaySystem(templates as unknown as ConstructorParameters<typeof ArcherPierceRaySystem>[0],random)
+    if(templates.tower_archers_lvl4){this.archerPierceCaster=new ArcherPierceCaster(templates.tower_archers_lvl4 as unknown as ConstructorParameters<typeof ArcherPierceCaster>[0]);this.archerPierceCaster.onSound=name=>this.onSound(name);this.archerPierceCaster.onShot=shot=>this.archerPierceRays.queue(shot)}
+    this.archerPierceRays.onCreateDamage=()=>this.onDamageCreate()
+    this.archerPierceRays.onDamage=(ray,enemy,value,damage_type)=>this.projectileHits.push({enemy,damage:{value,damage_type},bullet:this.templates[ray.name].bullet,popOrder:ray.damageOrder})
+    this.archerPierceRays.onEffect=(name,pos,time)=>this.effect(name,pos,time)
     const markAttack=(templates.tower_archers_lvl4 as unknown as {timed_attacks?:{list:ConstructorParameters<typeof ArcherMarkCaster>[0][]}}|undefined)?.timed_attacks?.list[1]
     if(markAttack){this.archerMarkCaster=new ArcherMarkCaster(markAttack);this.archerMarkCaster.onSound=name=>this.onSound(name)}
     this.firebookTrails=new FirebookTrailSystem(random)
@@ -108,12 +123,17 @@ export class RangedCombat {
     this.wizardTowers.onCopies=(_site,name,from,to,targetId,level,min,max,time)=>{const shot={name,from,to,targetId:Number(targetId),level,min,max,queuedAt:time};this.pendingCopies.set(shot,shot);this.onQueueProjectile(shot,name,time)}
     this.wizardTowers.onFirebook=(_site,name,from,to,_target,level,damageMin,damageMax,time)=>{const shot={name,from,to:{...to},level,damageMin,damageMax,factor:1};this.pendingCatapultShots.push(shot);this.onQueueProjectile(shot,name,time)}
     this.wizardTowers.onShoot=(site,name,from,target,sign,time)=>{const shot={name,from,to:{...target.pos},targetId:Number(target.id),factor:(this.templates[site.tower!].tower?.damage_factor??1)*(site.damageFactor??1),sign};this.pendingWizardShots.push(shot);this.onQueueProjectile(shot,name,time)}
+    this.nativeCulverine=new CulverineNativeRuntime(templates as unknown as ConstructorParameters<typeof CulverineNativeRuntime>[0],random)
+    this.nativeCulverine.candidates=(at,radius)=>this.enemyCandidates(this.currentEnemies,at,radius)
+    this.nativeCulverine.valid=e=>this.targetValid(e)
+    this.nativeCulverine.onEffect=(name,pos,time)=>this.effect(name,pos,time)
+    this.nativeCulverine.onDamage=(enemy,value,damage_type,reduce_armor,explosive_factor)=>this.queueNativeDamage(enemy,{value,damage_type,reduce_armor,explosive_factor})
     this.culverineRays=new CulverineRaySystem(templates as unknown as ConstructorParameters<typeof CulverineRaySystem>[0],onKill)
     this.culverineRays.targetValid=e=>this.targetValid(e)
     this.culverineRays.onEffect=(name,pos,time)=>this.effect(name,pos,time)
     this.culverineTowers=new CulverineTowerSystem(templates as unknown as ConstructorParameters<typeof CulverineTowerSystem>[0],random)
     this.culverineTowers.onSound=name=>this.onSound(name)
-    this.culverineTowers.onShoot=(name,from,to,target,factor,time)=>this.culverineRays.launch(name,from,to,target,undefined,factor,time)
+    this.culverineTowers.onShoot=(name,from,to,target,factor,time,site)=>{if(this.deferArcherControllers)this.nativeCulverine.queue(name,from,to,target,site,factor,time);else this.culverineRays.launch(name,from,to,target,undefined,factor,time)}
   }
   reserveCopiesProjectile(name:string){const model={};this.onAllocateProjectile(model,name);return model}
   queueCopiesBomb(model:object,shot:{name:string;from:Point;to:Point;level:number},time:number){const pending=Object.assign(model,{...shot,factor:1});this.pendingCatapultShots.push(pending);this.onQueueProjectile(pending,shot.name,time)}
@@ -126,13 +146,15 @@ export class RangedCombat {
     this.wizardTowers.states.delete(id)
     this.catapultTowers.states.delete(id)
     this.culverineTowers.states.delete(id)
+    this.archerPierceCaster?.states.delete(id)
+    this.archerMarkCaster?.states.delete(id)
   }
   /** Wizard filter17993 validates the attack forecast. FFE's separate prediction
    * argument is numeric zero: truthy in Lua, so range uses the current path node. */
   enemyCandidates:(pool:EnemyInstance[],at:Point,radius:number)=>EnemyInstance[]=(pool)=>pool
-  catapultTargets(site:TowerSite,enemies:EnemyInstance[],seconds:number,direction?:number){
+  catapultTargets(site:TowerSite,enemies:EnemyInstance[],seconds:number,direction?:number,visFlags?:number){
     const t=this.templates[site.tower!],a=t.attacks!.list[0],o=t.tower!.range_offset,origin={x:site.pos.x+o.x,y:site.pos.y+o.y},range=t.attacks!.range*(site.rangeFactor??1)
-    return luaSort(this.enemyCandidates(enemies,origin,range+seconds*150).filter(e=>e.hp>0&&!e.path.finished&&!((e.frozen?4096:e.template.vis.flags)&(site.attackBansOverride??a.vis_bans))&&!(e.template.vis.bans&a.vis_flags)).map(enemy=>({enemy,predicted:this.predictTarget(enemy,seconds)})).filter(({enemy,predicted})=>predicted.valid&&(predicted.pos.x-origin.x)**2+((predicted.pos.y-origin.y)/.7)**2<=range*range&&(direction===undefined||catapultDirection(origin,this.predictTarget(enemy,this.templates[a.bullet].bullet!.flight_time).pos)===direction)),(a,b)=>a.enemy.path.remainingNodes<b.enemy.path.remainingNodes)
+    return luaSort(this.enemyCandidates(enemies,origin,range+seconds*150).filter(e=>!enemyIsDead(e)&&!e.path.finished&&!((e.frozen?4096:e.template.vis.flags)&(site.attackBansOverride??a.vis_bans))&&!(e.template.vis.bans&(visFlags??a.vis_flags))).map(enemy=>({enemy,predicted:this.predictTarget(enemy,seconds)})).filter(({enemy,predicted})=>predicted.valid&&(predicted.pos.x-origin.x)**2+((predicted.pos.y-origin.y)/.7)**2<=range*range&&(direction===undefined||catapultDirection(origin,this.predictTarget(enemy,this.templates[a.bullet].bullet!.flight_time).pos)===direction)),(a,b)=>a.enemy.path.remainingNodes<b.enemy.path.remainingNodes)
   }
   wizardTargets(site:TowerSite,enemies:EnemyInstance[],attackIndex=0){
     const t=this.templates[site.tower!],a=t.attacks!.list[attackIndex],o=t.tower!.range_offset,origin={x:site.pos.x+o.x,y:site.pos.y+o.y},range=t.attacks!.range*(site.rangeFactor??1)
@@ -143,8 +165,10 @@ export class RangedCombat {
     }),(a,b)=>a.path.remainingNodes<b.path.remainingNodes).map(e=>({id:e.id,pos:e.path.position,hitOffset:e.template.unit.hit_offset}))
   }
   dodges?:DodgeSystem
-  private projectileHits:{enemy:EnemyInstance;damage:Damage;bullet?:CombatTemplate['bullet'];result?:number;popOrder?:number}[]=[]
+  private projectileHits:{enemy:EnemyInstance;damage:Damage;bullet?:CombatTemplate['bullet'];result?:number;popOrder?:number;onApplied?:(applied:number,result:number)=>void}[]=[]
   queueNativeDamage(enemy:EnemyInstance,damage:Damage,allocated=false){if(allocated)this.projectileHits.push({enemy,damage});else this.queueHit({enemy,damage})}
+  /** Hero projectiles enter the same health batch at their actual main-script slot. */
+  queueSharedDamage(enemy:EnemyInstance,damage:Damage,popOrder:number|undefined,onApplied:(applied:number,result:number)=>void){this.projectileHits.push({enemy,damage,popOrder,onApplied})}
   private queueHit(hit:(typeof this.projectileHits)[number]){const order=this.onDamageCreate();hit.popOrder=typeof order==='number'?order:undefined;this.projectileHits.push(hit)}
   /** Original health phase resolves queued damage in reverse insertion order,
    * then clamps HP/awards each death once. Other combat systems keep their own
@@ -152,16 +176,16 @@ export class RangedCombat {
   private resolveProjectileHits(time:number){
     const touched=new Set<EnemyInstance>()
     for(let i=this.projectileHits.length-1;i>=0;i--){
-      const {enemy:e,damage}=this.projectileHits[i],h=e.template.health
-      if(e.diedAt!==undefined||e.escapedAt!==undefined||h.ignore_damage||((h.immune_to??0)&damage.damage_type))continue
+      const hit=this.projectileHits[i],{enemy:e,damage}=hit,h=e.template.health
+      if(e.diedAt!==undefined||e.escapedAt!==undefined||h.ignore_damage||((h.immune_to??0)&damage.damage_type)){hit.onApplied?.(0,0);continue}
       recordEnemyDamage(e,damage.damage_type,time)
       const before=e.hp,applied=predictDamage({...h,hp:e.hp},damage)
-      e.hp-=applied;this.projectileHits[i].result=(applied>0?1:0)|(before>0&&e.hp<=0?2:0);touched.add(e)
+      e.hp-=applied;this.projectileHits[i].result=(applied>0?1:0)|(before>0&&e.hp<=0?2:0);touched.add(e);hit.onApplied?.(applied,hit.result!)
     }
     for(const e of touched)if(e.hp<=0){e.hp=0;e.diedAt=time;this.onKill(e)}
     // Native pops run after health, in original queue order (health runs backwards).
     // Projectile sources have no soldier/enemy component, so placement uses the target.
-    for(const hit of this.projectileHits){const b=hit.bullet;this.dodges?.showDamage(undefined,hit.enemy,time,b?.pop,b?.pop_chance,b?.pop_conds,hit.result??0,hit.popOrder)}
+    for(const hit of this.projectileHits){if(hit.onApplied)continue;const b=hit.bullet;this.dodges?.showDamage(undefined,hit.enemy,time,b?.pop,b?.pop_chance,b?.pop_conds,hit.result??0,hit.popOrder)}
     this.projectileHits.length=0
   }
   advance(time:number,sites:TowerSite[],enemies:EnemyInstance[],interleave?:(advanceSource:(site:TowerSite)=>void,advanceProjectile:(projectile:Projectile)=>void)=>void) {
@@ -176,12 +200,8 @@ export class RangedCombat {
     if(!this.deferArcherControllers)for(const shot of [...this.pendingArrows.values()])if(time>shot.queuedAt)this.insertArrow(shot,time,enemies)
     this.catapultTowers.advance(time,sites,()=>undefined,[])
     this.wizardTowers.advance(time,sites,()=>[],[])
-    const pickCulverine=(site:TowerSite)=>{
-      const t=this.templates[site.tower!],a=t.attacks!.list[0],o=t.tower!.range_offset,origin={x:site.pos.x+o.x,y:site.pos.y+o.y},range=t.attacks!.range*(site.rangeFactor??1)
-      const enemy=enemies.filter(e=>e.hp>0&&!e.path.finished&&this.targetValid(e)&&!(e.template.vis.flags&(site.attackBansOverride??a.vis_bans))&&!(e.template.vis.bans&a.vis_flags)&&(e.path.position.x-origin.x)**2+((e.path.position.y-origin.y)/.7)**2<=range*range).sort((a,b)=>a.path.remainingNodes-b.path.remainingNodes)[0]
-      if(!enemy)return
-      return {enemy,point:enemy.path.predict(enemy.blocked||enemy.meleeHolding||enemy.frozen||enemy.rangedHolding||enemy.skillLocked?0:enemy.template.motion.max_speed/30)}
-    }
+    this.currentEnemies=enemies
+    const pickCulverine=(site:TowerSite,ranged=true)=>{const selected=this.catapultTargets(site,enemies,1/30,undefined,ranged?undefined:0)[0];return selected?{enemy:selected.enemy,point:selected.predicted.pos}:undefined}
     this.culverineTowers.advance(time,sites,pickCulverine,[])
     const advanceSource=(site:TowerSite)=>{
       if(!site.tower || site.attackDisabled)return
@@ -248,7 +268,7 @@ export class RangedCombat {
       if(!projectile.nativePsCreated&&bullet.particles_name){projectile.nativePsCreated=true;this.onParticleCreate(bullet.particles_name,time,projectile)}
       if(projectile.motion) {
         const target=projectile.target,offset=bullet.ignore_hit_offset?{x:0,y:0}:target?.template.unit.hit_offset??{x:0,y:0}
-        if(projectile.tracking && target && enemies.includes(target) && target.hp>0 && target.escapedAt===undefined && !(target.template.vis.bans&2)) {
+        if(projectile.tracking && target && enemies.includes(target) && !enemyIsDead(target) && target.escapedAt===undefined && !(target.template.vis.bans&2)) {
           const next={x:target.path.position.x+offset.x,y:target.path.position.y+offset.y}
           if(Math.max(Math.abs(next.x-projectile.to.x),Math.abs(next.y-projectile.to.y))>(bullet.max_track_distance??128))projectile.tracking=false
           else projectile.to=next
@@ -281,7 +301,7 @@ export class RangedCombat {
       const radialCandidates=bullet.mod==='mod_firebook_aura'?this.enemyCandidates(enemies,projectile.to,bullet.damage_radius):enemies
       const targets=bullet.damage_radius>0?radialCandidates.filter(e=>e.hp>0 && this.targetValid(e) && !(e.template.vis.flags&(bullet.damage_bans??0)) && !(e.template.vis.bans&(bullet.damage_flags??0)) && (e.path.position.x-projectile.to.x)**2+(e.path.position.y-projectile.to.y)**2/(.7*.7)<=bullet.damage_radius**2):projectile.target?[projectile.target]:[]
       for(const enemy of targets) {
-        if(enemy.hp<=0 || enemy.escapedAt!==undefined)continue
+        if(enemyIsDead(enemy) || enemy.escapedAt!==undefined)continue
         if(!projectile.motion&&!bullet.damage_radius&&enemy.smokeDodgeUntil!==undefined&&time<=enemy.smokeDodgeUntil&&!enemy.template.unit.is_stunned)continue
         if(projectile.motion && (!projectile.tracking||!enemies.includes(enemy)))continue
         if(!projectile.motion && !bullet.damage_radius && Math.hypot(enemy.path.position.x+enemy.template.unit.hit_offset.x-projectile.to.x,enemy.path.position.y+enemy.template.unit.hit_offset.y-projectile.to.y)>(bullet.hit_distance??30))continue
@@ -315,6 +335,35 @@ export class RangedCombat {
         state.archers.set(sid,c);this.archerControllers.add(c);this.onQueueArcherController(c)
       }
     }
+    if(site.tower==='tower_archers_lvl4'){
+      const a=this.archerPierceCaster?.states.get(site.id),c=this.archerMarkCaster?.states.get(site.id)
+      // update_powers runs on outer-loop entry and inside timed windup yields,
+      // but not on the due-time release or the animation_wait continuation.
+      const updating=a?.phase==='windup'?time-a.started!<template.attacks!.list[1].shoot_time:a?.phase==='animation'?false:c?.started!==undefined?time-c.started<(template as unknown as {timed_attacks:{list:{cast_time:number}[]}}).timed_attacks.list[1].cast_time:!site.towerBlocked
+      if(updating){
+        this.onArcherPowerUpdates(site,time)
+        if((site.powerLevels?.skill_a??0)>0||a)this.archerPierceCaster?.syncUpgrades(site,time)
+        if((site.powerLevels?.skill_c??0)>0||c)this.archerMarkCaster?.syncUpgrades(site,time)
+      }
+    }
+    // A yielded C cast owns the tower until it releases; branch priority only
+    // applies when the tower coroutine returns to its outer loop.
+    if(site.tower==='tower_archers_lvl4'&&this.archerMarkCaster?.states.get(site.id)?.started!==undefined){
+      const c=(template as unknown as {timed_attacks:{list:{vis_flags:number;vis_bans:number;min_hp:number}[]}}).timed_attacks.list[1]
+      if(this.archerMarkCaster.advance(site,time,()=>this.archerTargets(site,template,{...attack,vis_flags:c.vis_flags,vis_bans:c.vis_bans},enemies).find(e=>e.hp>=c.min_hp)))return
+    }
+    if(site.tower==='tower_archers_lvl4'&&this.archerPierceCaster&&((site.powerLevels?.skill_a??0)>0||this.archerPierceCaster.states.has(site.id))){
+      const a=template.attacks!.list[1]
+      if(this.archerPierceCaster.advance(site,time,forecast=>this.archerTargets(site,template,a,enemies,forecast),{
+        shooterIndex:state.shooterIndex!,
+        select:(index,at)=>{state.shooterIndex=index;state.archers!.get(t.shooters_sids[index])!.idleTs=at},
+        animate:(index,target,at)=>{const c=state.archers!.get(t.shooters_sids[index])!,offset=t.render.sprites[c.sid-1].offset;if(c.animation!=='stun')c.bowPose={animation:c.animation,back:c.back,flipX:c.flipX,startedAt:c.startedAt,loop:c.loop};c.animation='stun';c.back=false;c.flipX=target.x<site.pos.x+offset.x;c.startedAt=at;c.loop=false},
+        resetBasic:at=>{state.archerTs=at},
+        flipLeft:index=>{state.archers!.get(t.shooters_sids[index])!.flipX=true},
+        finished:()=>{const index=this.archerPierceCaster!.states.get(site.id)!.shooterIndex!,c=state.archers!.get(t.shooters_sids[index])!;return nativeLogicAnimationFrame(c.animation==='stun'?58:c.animation==='idle'?1:28,time,c.startedAt,c.loop,30).runs>0}
+      }))return
+    }
+    if(site.tower==='tower_archers_lvl4'&&this.onArcherRangeMain(site,time))return
     if(site.tower==='tower_archers_lvl4'&&this.archerMarkCaster&&((site.powerLevels?.skill_c??0)>0||this.archerMarkCaster.states.has(site.id))){
       const c=(template as unknown as {timed_attacks:{list:{vis_flags:number;vis_bans:number;min_hp:number}[]}}).timed_attacks.list[1]
       if(this.archerMarkCaster.advance(site,time,()=>this.archerTargets(site,template,{...attack,vis_flags:c.vis_flags,vis_bans:c.vis_bans},enemies).find(e=>e.hp>=c.min_hp)))return
@@ -341,10 +390,10 @@ export class RangedCombat {
     if(c.removed)return
     const t=this.templates[c.key],a={...t.attacks!.list[0],bullet:this.bulletOverrides.get(c.site.id)??t.attacks!.list[0].bullet},idle=t.tower!.long_idle_cooldown??3
     if(!c.initialized){c.initialized=true;c.idleCooldown=idle+this.random();c.idleTs=time-c.idleCooldown}
-    const animate=()=>{const f=archerGeometry(c.site.pos,t as ArcherTemplate,c.sid,c.predPos);c.back=f.back;c.flipX=f.flipX;c.animation='shoot';c.loop=false}
-    if(c.phase==='idle'&&c.pending){c.pending=false;c.phase='windup';c.startedAt=time;animate()}
+    const animate=()=>{const f=archerGeometry(c.site.pos,t as ArcherTemplate,c.sid,c.predPos);c.back=f.back;c.flipX=f.flipX;c.animation='shoot';c.bowPose=undefined;c.startedAt=c.windupAt??c.startedAt;c.loop=false}
+    if(c.phase==='idle'&&c.pending){c.pending=false;c.phase='windup';c.startedAt=c.windupAt=time;animate()}
     if(c.phase==='windup'){
-      if(time-c.startedAt<Math.round(a.shoot_time*30)/30)return
+      if(time-(c.windupAt??c.startedAt)<Math.round(a.shoot_time*30)/30)return
       const selected=this.archerTargets(c.site,t,a,enemies,10/30)[0],enemy=selected??c.target!
       if(selected){c.predPos=selected.path.position;animate()}
       const b=this.templates[a.bullet].bullet!,from=archerGeometry(c.site.pos,t as ArcherTemplate,c.sid,c.predPos).from,offset=enemy.template.unit.hit_offset
@@ -354,13 +403,13 @@ export class RangedCombat {
       this.pendingArrows.set(shot,shot);this.onQueueProjectile(shot,a.bullet,time);c.phase='animation'
     }
     if(c.phase==='animation'){
-      if(nativeLogicAnimationFrame(28,time,c.startedAt,false,30).runs===0)return
+      if(nativeLogicAnimationFrame(c.animation==='stun'?58:c.animation==='idle'?1:28,time,c.startedAt,c.loop,30).runs===0)return
       c.idleTs=time;c.phase='idle'
     }
     if(c.idleCooldown<time-c.idleTs){
       c.idleTs=time;c.idleCooldown=idle+this.random()
       const pos=t.tower!.long_idle_pos?.[c.shooterId]??{x:1024,y:0}
-      c.animation='idle';c.loop=true;c.back=pos.y>c.site.pos.y;c.flipX=pos.x<c.site.pos.x
+      c.animation='idle';c.bowPose=undefined;c.loop=true;c.back=pos.y>c.site.pos.y;c.flipX=pos.x<c.site.pos.x
       // animation_start(loop=true) preserves the previous native sprite clock.
     }
   }
@@ -431,7 +480,7 @@ export class RangedCombat {
       const factor=p.damageFactor??b.damage_factor,raw=p.fixedDamage!==undefined?Math.max(1,Math.ceil(p.fixedDamage*factor)):bulletDamageValue(p.damageMin??b.damage_min,p.damageMax??b.damage_max,factor,this.random)
       this.queueHit({enemy:e,bullet:b,damage:{value:raw,damage_type:b.damage_type,reduce_armor:p.reduceArmor??b.reduce_armor,reduce_magic_armor:b.reduce_magic_armor}})
       if(b.hit_fx)this.effect(b.hit_fx,hitPos,time)
-      if(b.hit_blood_fx && e.template.unit.blood_color!=='none'){this.effect(b.hit_blood_fx,hitPos,time,{rotation:p.rotation,bloodColor:e.template.unit.blood_color});const bloodSound=this.templates[b.hit_blood_fx]?.sound_events?.insert;if(bloodSound)this.onSound(bloodSound)}
+      if(b.hit_blood_fx && e.template.unit.blood_color!=='none'){this.effect(b.hit_blood_fx,hitPos,time,{rotation:p.rotation,bloodColor:e.template.unit.blood_color});const bloodSound=this.templates[b.hit_blood_fx]?.sound_events?.insert;if(bloodSound&&!this.deferEffectInsertSound)this.onSound(bloodSound)}
     }
     // Original arrow.update creates dodge pop and requests hit sound before
     // allocating miss FX/decal; their entity IDs affect later Lua table order.

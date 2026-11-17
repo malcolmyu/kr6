@@ -1,3 +1,4 @@
+import {soldierIsDead} from './SoldierHealth.ts'
 import {nativeLogicAnimationFrame} from './NativeAnimation.ts'
 import {GeraldModifierRuntime} from './GeraldModifierRuntime.ts'
 import type {HeroUnit} from './HeroSystem'
@@ -31,7 +32,7 @@ export class GeraldSkills {
  }
  apply(kind:GeraldSkill,target:SoldierInstance,time:number){
   if(this.deferModifiers){this.nativeModifiers.queue(kind,target,this.modifiers[kind]);return}
-  if(target.hp<=0)return
+  if(soldierIsDead(target))return
   const vis=target.template.vis??{flags:1025,bans:0};if(vis.bans&4)return
   const key=`gerald-${kind}-${target.id}`,previous=this.buffs.get(key)
   if(previous){previous.born=time;return}
@@ -52,7 +53,7 @@ export class GeraldSkills {
   if(!this.deferModifiers)time=Math.round(time*30)/30
   for(const [key,buff]of this.buffs){
    const start=buff.kind==='skill_a'?6/30:12/30
-   if(buff.endingAt===undefined && time-buff.born+1e-9>=start && (buff.target.hp<=0||!soldiers.includes(buff.target)||time-buff.born+1e-9>=buff.duration))buff.endingAt=time
+   if(buff.endingAt===undefined && time-buff.born+1e-9>=start && (soldierIsDead(buff.target)||!soldiers.includes(buff.target)||time-buff.born+1e-9>=buff.duration))buff.endingAt=time
    const tail=buff.kind==='skill_a'?11/30:1
    if(buff.endingAt!==undefined && time-buff.endingAt+1e-9>=tail){buff.target.buffs?.delete(key);this.buffs.delete(key)}
   }
@@ -82,7 +83,7 @@ export class GeraldSkills {
   if(!afterMelee&&this.levels.skill_a && time-this.lastCast.skill_a>16){
    const targets=(this.candidates?.(hero)??soldiers).filter(s=>{
     const vis=s.template.vis??{flags:1025,bans:0},dx=s.pos.x-hero.pos.x,dy=s.pos.y-hero.pos.y
-    return s!==hero&&s.hp>0&&s.target!==undefined&&!(vis.bans&8)&&!(vis.flags&2048)&&dx*dx+(dy/.7)**2<=60**2
+    return s!==hero&&!soldierIsDead(s)&&s.target!==undefined&&!(vis.bans&8)&&!(vis.flags&2048)&&dx*dx+(dy/.7)**2<=60**2
    })
    if(targets.length){this.begin('skill_a',hero,targets,time);return}
    this.lastCast.skill_a=time-16+10/30-(this.deferModifiers?1e-6:0)

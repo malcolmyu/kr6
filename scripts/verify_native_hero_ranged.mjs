@@ -7,7 +7,7 @@ g.heroes.playerLevel=native.playerLevel;g.heroes.savedXp={hero_gerald:0,hero_zef
 const r=g.heroes.ranged,queues=[],removes=[],damages=[],serials=new WeakMap(),queue=r.onQueueProjectile,remove=r.onRemoveProjectile,resolve=r.resolveHits.bind(r),enemies=native.events.filter(e=>e.kind==='create'&&e.template.startsWith('enemy_')),originalQueues=native.events.filter(e=>e.kind==='queueInsert'&&e.template==='bullet_zefira'),ids=originalQueues.map(e=>e.id)
 r.onQueueProjectile=(p,time)=>{serials.set(p,queues.length);queues.push({tick:Math.round(time*30),target:p.target.id,from:{...p.pos},to:{...p.to}});queue(p,time)}
 r.onRemoveProjectile=p=>{removes.push({tick:Math.round(g.time*30),serial:serials.get(p)});remove(p)}
-r.resolveHits=time=>{const pending=r.hits.map(h=>({p:h.p,value:h.value,before:h.p.target.hp}));resolve(time);for(const h of pending)damages.push({tick:Math.round(time*30),serial:serials.get(h.p),target:h.p.target.id,value:h.value,applied:h.before-h.p.target.hp})}
+r.resolveHits=time=>{const pending=r.hits.map(h=>({hit:h,p:h.p,value:h.value}));resolve(time);for(const h of pending)damages.push({tick:Math.round(time*30),serial:serials.get(h.p),target:h.p.target.id,value:h.value,applied:h.hit.applied??0})}
 let samples=0
 for(const f of native.frames.slice(0,1288)){
  for(const c of commands.filter(c=>c.tick===f.tick))if(c.kind==='send_wave')g.callNextWave();else g.build(c.holder,c.tower)

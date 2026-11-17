@@ -11,6 +11,7 @@ export class EnemySkills {
  readonly areas:SmokeArea[]=[]
  readonly casting=new Map<number,{at:number;activated:boolean}>()
  onSound:(name:string)=>void=()=>{}
+ onHealthBarAlpha:(enemy:EnemyInstance,alpha:number)=>void=()=>{}
  private templates:Record<string,SmokeTemplate>
  private level:LevelData
  private random:()=>number
@@ -36,7 +37,7 @@ export class EnemySkills {
     if(e.hp<=0||e.template.unit.is_stunned){this.casting.delete(e.id);e.skillLocked=false;e.visualOverride=undefined;return false}
     return true
    }
-   s.activated=true;e.hp=maxHp;e.template.health.ignore_damage=true;e.template.vis.bans=0xffffffff;this.onSound(b.sound);this.runtime.queue(e,time)
+   s.activated=true;this.onHealthBarAlpha(e,0);e.hp=maxHp;e.template.health.ignore_damage=true;e.template.vis.bans=0xffffffff;this.onSound(b.sound);this.runtime.queue(e,time)
   }
   const frames=Math.round((e.template.webAnimationDurations?.[b.animation]??44/30)*30)
   if(nativeLogicAnimationFrame(frames,time,s.at,false,30).runs>0){this.onDeparture(e);this.casting.delete(e.id)}
@@ -59,7 +60,7 @@ export class EnemySkills {
    if(e.template.unit.is_stunned&&!state.activated){this.casting.delete(e.id);e.skillLocked=false;e.visualOverride=undefined;continue}
    const age=time-state.at
    if(!state.activated&&age>=Math.round(b.delay*30)/30){
-    state.activated=true;e.hp=maxHp;e.template.health.ignore_damage=true;e.template.vis.bans=0xffffffff
+    state.activated=true;this.onHealthBarAlpha(e,0);e.hp=maxHp;e.template.health.ignore_damage=true;e.template.vis.bans=0xffffffff
     this.onSound(b.sound)
     const geometry=this.areaGeometry(e.path.position),a=this.templates[b.smoke_t].aura!
     this.areas.push({id:this.nextId++,pos:geometry.pos,born:time,duration:a.duration[1],lastApply:time-a.cycle_time,decals:geometry.decals.map(pos=>({pos,animationAt:time-Math.floor(this.random()*16)/30}))})

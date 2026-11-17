@@ -1,0 +1,2 @@
+import {execFileSync} from 'node:child_process'
+for(const [level,kind]of [[1,'normal'],[2,'normal'],[3,'normal'],[1,'sale'],[1,'upgrade'],[1,'preview'],[1,'stronger'],[1,'equal'],[1,'abc'],[1,'target-rebuild'],[1,'target-kind'],[1,'target-rebuild-upgrade'],[1,'target-upgrade-gui'],[1,'target-queued-sale']])process.stdout.write(execFileSync(process.execPath,['scripts/verify_archers_range_native_chain.mjs',String(level),kind]))

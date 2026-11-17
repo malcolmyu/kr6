@@ -5,12 +5,14 @@ import {waitForGame,confirmTowerAction} from './browser_helpers.mjs'
 const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true})
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],missing=[];page.setDefaultTimeout(45000)
- page.on('pageerror',e=>{errors.push(e.message);console.error(e.message)});page.on('response',r=>{if(r.status()>=400)missing.push(r.url())})
+ page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack)});page.on('response',r=>{if(r.status()>=400)missing.push(r.url())})
  await page.addInitScript(()=>{Math.random=()=>.5;localStorage.setItem('kingdom-rush-6.progress.v1',JSON.stringify({levels:{1:{campaign:3,iron:true},2:{campaign:3}}}))})
  await page.route('**/data/level03-campaign.json',route=>route.fulfill({json:{format:'tsv',commands:[{name:'gold',value:5000},{name:'lives',value:20},{name:'wave',wait_time:-1},{name:'wait',wait_time:9999}]}}))
  await page.goto('http://127.0.0.1:5173/?debug=1');await page.getByRole('button',{name:'开始游戏',exact:true}).click();await page.getByRole('button',{name:'点击开始',exact:true}).click();await selectDefaultSlot(page);await waitForGame(page)
  await page.evaluate(async()=>{
   const resource=performance.getEntriesByType('resource').find(r=>r.name.includes('/src/game/GameSession.ts')).name,{GameSession}=await import(resource),advance=GameSession.prototype.advance
+  const worldUrl=performance.getEntriesByType('resource').find(r=>r.name.includes('/src/game/WorldRenderer.ts')).name,{WorldRenderer}=await import(worldUrl),render=WorldRenderer.prototype.renderTowers
+  WorldRenderer.prototype.renderTowers=function(){render.call(this);if(this.session===window.culvTowerSession)window.culvWorld=this}
   GameSession.prototype.advance=function(dt){
    advance.call(this,dt)
    if(!this.levelData.data.entities_list.some(e=>e.template==='decal_stage_03_cow'))return
@@ -18,10 +20,10 @@ try{
    if(!this.culvTowerSite){const p=this.levelData.paths.paths[2][0][99];this.culvTowerSite=this.towers.sites.filter(s=>!s.tower&&!s.building).sort((a,b)=>Math.hypot(a.pos.x-p.x,a.pos.y-p.y)-Math.hypot(b.pos.x-p.x,b.pos.y-p.y))[0];for(const h of this.heroes.team)h.scriptLocked=true}
    const site=this.culvTowerSite
    if(site.tower?.startsWith('tower_culverine_')&&site.tower!==this.culvTowerKey){
-    this.culvTowerKey=site.tower;this.culvTowerCaptured=false;this.enemies.length=0
-    this.spawn({enemy:'enemy_blackguard',pi:3,spi:1},this.time);const e=this.enemies.at(-1);e.path.ni=100;Object.assign(e.path.position,this.levelData.paths.paths[2][0][99]);e.frozen=true;this.culvTowerTarget=e;this.culvTowerBefore=e.hp
+    this.culvTowerKey=site.tower;this.culvTowerCaptured=false;for(const enemy of this.enemies)this.entities.remove(enemy)
+    this.spawnCinematicEnemy('enemy_blackguard',3,this.levelData.paths.paths[2][0][99]);const e=this.enemies.at(-1);e.hp=e.template.health.hp_max=10000;e.path.ni=100;Object.assign(e.path.position,this.levelData.paths.paths[2][0][99]);e.frozen=true;this.culvTowerTarget=e;this.culvTowerBefore=e.hp
    }
-   if(this.culvTowerTarget){const ray=this.combat.culverineRays.rays.find(r=>r.name===`bullet_culverine_lvl${site.tower.match(/lvl(\d+)/)[1]}`&&r.born!==undefined&&!r.hidden&&!r.removed),state=this.combat.culverineTowers.states.get(site.id)
+   if(this.culvTowerTarget){const ray=this.combat.nativeCulverine.rays.find(r=>r.name===`bullet_culverine_lvl${site.tower.match(/lvl(\d+)/)[1]}`&&r.born!==undefined&&!r.hidden&&!r.removed),state=this.combat.culverineTowers.states.get(site.id)
     window.culvTowerObservation={key:site.tower,visible:!!ray,damage:this.culvTowerBefore-this.culvTowerTarget.hp,parts:state?.parts,available:this.towers.available}
     if(ray&&!this.culvTowerCaptured){this.culvTowerCaptured=true;this.paused=true}
    }
@@ -33,6 +35,13 @@ try{
  for(let level=1;level<=4;level++){
   if(level>1){await page.evaluate(()=>{window.culvTowerSession.paused=false});await click();await confirmTowerAction(page,/^升级 ·/)}
   await page.waitForFunction(l=>window.culvTowerObservation?.key===`tower_culverine_lvl${l}`&&window.culvTowerObservation.visible,level)
+  await page.waitForFunction(()=>{const g=window.culvTowerSession,w=window.culvWorld;return w&&g.combat.nativeCulverine.rays.some(r=>!r.hidden&&w.projectileSprites.has(r.id))})
+  const paint=await page.evaluate(()=>{
+   const g=window.culvTowerSession,w=window.culvWorld,ray=g.combat.nativeCulverine.rays.find(r=>!r.hidden&&!r.removed),id=g.entities.entity(ray).id,art=w.projectileSprites.get(ray.id)
+   let key;art.root.traverse(o=>{if(o.isMesh)key=o.userData.nativePaint?.key})
+   const decals=[...g.combat.nativeCulverine.decals].map(m=>{const art=w.culverineNativeRenderer.sprites.get(m);let key,alpha;art?.root.traverse(o=>{if(o.isMesh){key=o.userData.nativePaint?.key;alpha=o.material.opacity}});return {key,wanted:`${g.entities.entity(m).id}:sprite:1`,alpha,wantedAlpha:m.alpha/255}})
+   return {key,wanted:`${id}:sprite:1`,decals}
+  });assert.equal(paint.key,paint.wanted);assert(paint.decals.length>0);assert(paint.decals.every(d=>d.key===d.wanted&&d.alpha===d.wantedAlpha))
   const o=await page.evaluate(()=>window.culvTowerObservation);assert(o.damage>0);assert.equal(o.parts.length,5);await page.screenshot({path:`analysis/web-culverine-tower-lv${level}.png`})
  }
  assert.deepEqual(errors,[]);assert.deepEqual(missing,[])

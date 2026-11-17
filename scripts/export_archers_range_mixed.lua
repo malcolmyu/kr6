@@ -1,0 +1,3 @@
+local f=assert(io.open('scripts/export_level_entity_bootstrap.lua'));local source=f:read('*a');f:close()
+source=source:gsub('hp=entity.health and entity.health.hp,','rangeFactor=entity.range_factor,rangeTween=entity.tween and entity.tween.ts,rangeDraw=entity.render and entity.render.sprites[1]and entity.render.sprites[1].draw_order,modifierLevel=entity.modifier and entity.modifier.level,towerRange=entity.attacks and entity.attacks.range,damageFactor=entity.health and entity.health.damage_factor,hp=entity.health and entity.health.hp,',1)
+assert(loadstring(source,'@scripts/export_level_entity_bootstrap.lua'))()

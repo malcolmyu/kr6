@@ -1,3 +1,4 @@
+import {soldierIsDead} from './SoldierHealth.ts'
 import frames from '../../public/data/enemy-melee-frames.json' with {type:'json'}
 import {nativeLogicAnimationFrame} from './NativeAnimation.ts'
 import type {EnemyInstance} from './GameSession'
@@ -35,7 +36,7 @@ export class EnemyMelee {
   if(stickiness)s.quadrant=quadrant
   s.sprite={name:config.angles.walk[index],at:s.sprite.at,loop:true,facingLeft:quadrant===2};e.visualOverride=s.sprite
  }
- private canMelee(e:EnemyInstance,s:SoldierInstance){return s.hp>0&&!e.template.unit.is_stunned&&this.blockers(e).includes(s)}
+ private canMelee(e:EnemyInstance,s:SoldierInstance){return !soldierIsDead(s)&&!e.template.unit.is_stunned&&this.blockers(e).includes(s)}
  resumeDeath(e:EnemyInstance,time:number){
   const s=this.states.get(e)
   if(s&&s.phase==='melee'){s.phase='exit';return false}

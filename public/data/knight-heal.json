@@ -1,0 +1,1 @@
+{"attack":{"chance":1,"disabled":true,"animation":"heal","vis_bans":0,"cast_times":[0.26666666666666666,0.6],"cooldown":15,"type":"custom","vis_flags":0,"sound":"TowerKnightsOrderResilienceCast","ts":0},"fractions":[0.25,0.4,0.6],"frames":30}

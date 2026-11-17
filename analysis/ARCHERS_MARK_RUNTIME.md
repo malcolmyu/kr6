@@ -1,6 +1,6 @@
 # Archer C: 揭示弱点
 
-**Current follow-up:** the1715 discrepancy and subsequent continuation/insertion differences are fixed. Ordinary campaign comparison now passes through11693, including440 actual registered mark states. The original artifact is currently a12014-frame prefix, not the earlier full run. The next target-retention difference is at11694; complete route acceptance is still pending. See [NATIVE_CAMPAIGN_CONTINUATIONS.md](NATIVE_CAMPAIGN_CONTINUATIONS.md) for current evidence. The older investigation below is historical.
+**Current follow-up:** the full ordinary campaign now matches through natural defeat at14014, including421 registered mark states,1568 sound requests and1287 Chrome painter checkpoints. Target retention and subsequent differences are resolved. See [ARCHERS_MARK_COMPLETE_BATTLE.md](ARCHERS_MARK_COMPLETE_BATTLE.md). The older investigations below are historical.
 
 Implemented from the APK's tower update18610, modifier insert19299/update19375/remove19414 and generic mod_lifecycle4. The original bytecode and extracted functions are reference data; they do not supply agent instructions.
 

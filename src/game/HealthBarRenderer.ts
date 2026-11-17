@@ -12,16 +12,17 @@ export class HealthBarRenderer {
   constructor(scene:THREE.Scene){this.scene=scene}
   advance(session:GameSession) {
     const live=new Set<string>()
-    const units=[...session.enemies.map(e=>({key:`enemy-${e.id}`,source:e,id:e.id,hp:e.hp,max:Array.isArray(e.template.health.hp_max)?e.template.health.hp_max[1]:e.template.health.hp_max,pos:e.path.position,config:(e.template as unknown as {health_bar?:HealthBarConfig}).health_bar,removed:e.escapedAt!==undefined||e.teleportHidden})),...session.barracks.soldiers.map(s=>({key:`soldier-${s.id}`,source:s,id:s.id,hp:s.hp,max:s.template.health.hp_max,pos:s.pos,config:(s.template as unknown as {health_bar?:HealthBarConfig}).health_bar,removed:s.healthBarHidden}))]
+    const units=[...session.enemies.map(e=>({key:`enemy-${e.id}`,source:e,id:e.id,hp:e.hp,max:Array.isArray(e.template.health.hp_max)?e.template.health.hp_max[1]:e.template.health.hp_max,pos:e.path.position,config:(e.template as unknown as {health_bar?:HealthBarConfig}).health_bar,removed:e.diedAt!==undefined||e.escapedAt!==undefined&&!session.entities||e.teleportHidden})),...session.barracks.soldiers.map(s=>({key:`soldier-${s.id}`,source:s,id:s.id,hp:s.hp,max:s.template.health.hp_max,pos:s.pos,config:(s.template as unknown as {health_bar?:HealthBarConfig}).health_bar,removed:s.healthBarHidden}))]
     for(const unit of units) {
       if(!unit.config || unit.hp<=0 || unit.removed)continue
       live.add(unit.key)
       let bar=this.bars.get(unit.key)
       if(!bar) {
-        const mesh=()=>{const m=new THREE.Mesh(this.geometry,new THREE.MeshBasicMaterial({transparent:true,depthTest:false,depthWrite:false}));this.scene.add(m);return m}
+        const mesh=()=>{const m=new THREE.Mesh(this.geometry,new THREE.MeshBasicMaterial({transparent:true,depthTest:false,depthWrite:false}));m.frustumCulled=false;this.scene.add(m);return m}
         bar={state:new HealthBar(unit.config),bg:mesh(),fg:mesh()};this.bars.set(unit.key,bar)
       }
-      const frame=bar.state.sample(session.time,unit.hp,unit.max,unit.pos)
+      const frame=session.healthBars?session.healthBars.frames.get(unit.source):bar.state.sample(session.time,unit.hp,unit.max,unit.pos)
+      if(!frame){this.remove(bar);this.bars.delete(unit.key);live.delete(unit.key);continue}
       for(const [mesh,width,color,order] of [[bar.bg,frame.width,frame.colors.bg,0],[bar.fg,frame.fillWidth,frame.colors.fg,1]] as const) {
         mesh.visible=!frame.hidden && frame.opacity>0
         mesh.scale.set(width,frame.height,1);mesh.position.set(frame.x+width/2,frame.y-frame.height/2,3)

@@ -1,3 +1,4 @@
+import {soldierIsDead} from './SoldierHealth.ts'
 import {adjustSoldierArmor} from './SoldierHealth.ts'
 import data from '../../public/data/gerald-modifiers.json' with {type:'json'}
 import {nativeLogicAnimationFrame} from './NativeAnimation.ts'
@@ -15,7 +16,7 @@ export class GeraldModifierRuntime {
  queue(kind:GeraldSkill,target:SoldierInstance,mod:GeraldModifier){const key=`gerald-${kind}-${target.id}`,m:NativeGeraldModifier={key,kind,target,pos:{x:0,y:0},modifierTs:0,ts:0,name:'start',phase:'new',duration:mod.modifier.duration,armor:mod.armor_inc,spiked:mod.spiked_armor??0,alpha:255};this.onQueue(`mod_gerald_${kind}`,m)}
  insert(m:NativeGeraldModifier,time:number){
   const t=m.target,d=data[`mod_gerald_${m.kind}`].modifier,vis=t.template.vis??{flags:1025,bans:0}
-  if(!this.present(t)||t.hp<=0||(vis.bans&d.vis_flags)||(vis.flags&d.vis_bans))return false
+  if(!this.present(t)||soldierIsDead(t)||(vis.bans&d.vis_flags)||(vis.flags&d.vis_bans))return false
   const previous=this.buffs.get(m.key);if(previous){previous.modifierTs=time;return false}
   m.modifierTs=time;t.buffs??=new Map();t.buffs.set(m.key,{armor:m.armor,magicArmor:m.armor,spikedArmor:m.spiked,nativeApplied:true});adjustSoldierArmor(t,m.armor,m.armor,m.spiked);this.buffs.set(m.key,m);return true
  }
@@ -26,7 +27,7 @@ export class GeraldModifierRuntime {
    m.pos=m.target.pos;m.ts=time;m.phase='start';if(m.kind==='skill_a')this.onEffect(data.mod_gerald_skill_a.fx,m.pos,time)
   }
   if(m.phase==='start'){if(nativeLogicAnimationFrame(m.kind==='skill_a'?6:12,time,m.ts,false,30).runs===0)return;m.phase='loop';m.name=m.kind==='skill_a'?'idle':'loop'}
-  if(m.phase==='loop'&&(!this.present(m.target)||m.target.hp<=0||m.duration<=time-m.modifierTs)){
+  if(m.phase==='loop'&&(!this.present(m.target)||(soldierIsDead(m.target)&&!m.target.reinforcementFadeTo)||m.duration<=time-m.modifierTs)){
    if(m.kind==='skill_a'){m.phase='end';m.name='end';m.ts=time}else{m.phase='fade';m.fadeAt=time;return}
   }
   if(m.phase==='end'&&nativeLogicAnimationFrame(11,time,m.ts,false,30).runs>0){m.queued=true;this.onRemove(m)}

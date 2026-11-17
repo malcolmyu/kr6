@@ -1,0 +1,2 @@
+import {execFileSync} from 'node:child_process'
+for(const [level,kind]of [[1,'normal'],[2,'normal'],[3,'normal'],...[ 'preview','rank-up','source-sale','source-windup','target-upgrade','target-windup','target-sale','target-rebuild','equal','stronger','stronger-late'].map(k=>[1,k])])process.stdout.write(execFileSync(process.execPath,['scripts/verify_wizard_empower_native_chain.mjs',String(level),kind]))

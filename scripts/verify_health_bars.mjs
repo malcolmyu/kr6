@@ -1,3 +1,4 @@
+import {HealthBarRuntime} from '../src/game/HealthBarRuntime.ts'
 import {readFileSync} from 'node:fs'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
@@ -28,3 +29,23 @@ assert.equal(renderer.bars.get('enemy-1').bg.visible,false,'Full-health enemy st
 enemy.hp=20;session.time=.1;renderer.advance(session);session.time=.3;renderer.advance(session)
 const rendered=renderer.bars.get('enemy-1');assert(rendered.bg.visible);assert.equal(rendered.fg.scale.x,8);assert.equal(rendered.bg.scale.x,16);assert.equal(rendered.fg.position.x,96);assert.equal(rendered.fg.material.color.getHexString(),'00ba00')
 enemy.hp=0;renderer.advance(session);assert.equal(scene.children.length,0);assert.equal(renderer.bars.size,0);renderer.dispose()
+
+// Native fades must advance through ticks that have no browser paint.
+let sparseFrames=0
+for(const row of read('analysis/health-bars-oracle.json')){
+ const config=structuredClone(templates[row.name].health_bar),source={id:row.id,hp:100,template:{health:{hp_max:100},health_bar:config},path:{position:{x:100.75,y:200.25}}},healthBars=new HealthBarRuntime(),session={time:0,enemies:[source],barracks:{soldiers:[]},healthBars},scene=new THREE.Scene(),renderer=new HealthBarRenderer(scene)
+ for(const native of row.frames){
+  source.hp=native.hp;config.hidden=native.hidden;session.time=native.frame/30;healthBars.advance(session)
+  const state=healthBars.states.get(source),frame=healthBars.frames.get(source)
+  assert(Math.abs(state.alpha-native.alpha)<1e-9,'Simulation-owned native alpha')
+  if(native.fadeAt===undefined)assert.equal(state.fadeAt,undefined);else assert(Math.abs(state.fadeAt-native.fadeAt)<1e-12)
+  assert.equal(frame.hidden,native.bg.hidden)
+  if(native.frame%7===0||native.frame===row.frames.at(-1).frame){
+   renderer.advance(session);const rendered=renderer.bars.get(`enemy-${row.id}`)
+   if(!native.bg.hidden)for(const kind of ['bg','fg'])assert(Math.abs(rendered[kind].material.opacity-native[kind].alpha/255)<1e-12,'Sparse paint preserves original opacity')
+  }
+  sparseFrames++
+ }
+ renderer.dispose()
+}
+console.log(`${sparseFrames} native health-bar states also match with sparse browser paints; simulation owns fade clocks`)

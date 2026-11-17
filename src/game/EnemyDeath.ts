@@ -7,6 +7,8 @@ import type {Point} from './types'
 export interface BloodDecal {z?:number;sort_y_offset?:number;pos:Point;at:number;color:string;alpha:number;removalQueuedAt?:number}
 export interface DeathEffect {name:string;pos:Point;at:number;sprite:string;offsetY?:number;presented?:boolean;alpha:number;removalQueuedAt?:number}
 interface State {waiting?:boolean;started?:number;finished?:number;fadeAt?:number;delay?:number;duration?:number}
+/** A yielding smoke cast can restore corpse HP without clearing health.dead. */
+export function enemyIsDead(e:EnemyInstance){return e.hp<=0||e.diedAt!==undefined}
 export function recordEnemyDamage(e:EnemyInstance,type:number,time:number){
  if(e.damageTypesAt!==time){e.damageTypesAt=time;e.lastDamageTypes=0}
  e.lastDamageTypes=(e.lastDamageTypes??0)|type

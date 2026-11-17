@@ -13,10 +13,14 @@ export class ArcherMarkCaster {
  private attack:Attack
  constructor(attack:Attack){this.attack=attack}
  resetSkillCooldowns(site:TowerSite,time:number){const state=this.states.get(site.id),ts=resetSkillTimestamp(this.attack,time);if(state&&ts!==undefined)state.ts=ts}
- advance(site:TowerSite,time:number,find:()=>EnemyInstance|undefined){
+ private state(site:TowerSite){
   let state=this.states.get(site.id)
   if(!state||state.instance!==(site.instance??0)){state={site,instance:site.instance??0,level:0,ts:0};this.states.set(site.id,state)}
-  const a=this.attack,upgrades=()=>{const level=site.powerLevels?.skill_c??0;if(level!==state!.level){state!.level=level;if(level===1)state!.ts=time-a.cooldown}}
+  return state
+ }
+ syncUpgrades(site:TowerSite,time:number){const state=this.state(site),level=site.powerLevels?.skill_c??0;if(level!==state.level){state.level=level;if(level===1)state.ts=time-this.attack.cooldown}}
+ advance(site:TowerSite,time:number,find:()=>EnemyInstance|undefined){
+  const state=this.state(site),a=this.attack,upgrades=()=>this.syncUpgrades(site,time)
   if(state.started!==undefined){
    // changed powers are processed inside each yield of the ongoing cast.
    if(time-state.started<a.cast_time){upgrades();return true}

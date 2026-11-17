@@ -1,5 +1,5 @@
 import data from '../../public/data/reinforcements.json' with {type:'json'}
-import {nativeAnimationFrame} from './NativeAnimation.ts'
+import {nativeAnimationFrame,nativeLogicAnimationFrame} from './NativeAnimation.ts'
 import type {Point} from './types'
 export function reinforcementSquad(pos:Point,special:boolean){
  const result:{name:string;pos:Point;slot:number}[]=[]
@@ -16,14 +16,16 @@ export class SpecialReinforcementAttack {
  name='attack_in';at:number;attackTs=0;done=false;result=false
  private phase:'in'|'hit'|'loop'|'out'='in'
  private started:number
- constructor(time:number){this.at=time;this.started=time}
+ private nativeLogic:boolean
+ constructor(time:number,nativeLogic=false){this.at=time;this.started=time;this.nativeLogic=nativeLogic}
+ private finished(name:string,time:number){return this.nativeLogic?nativeLogicAnimationFrame(reinforcementFrames('reinforcements_lvl3_special_unit',name)??1,time,this.at,false,30).runs>0:reinforcementAnimationFinished(name,time-this.at)}
  advance(time:number,state:{dead?:boolean;stunned?:boolean;rally?:boolean}){
   let hit=false
   if(this.done)return hit
   const finish=()=>{this.done=true}
   const out=()=>{this.phase='out';this.name='attack_out';this.at=time}
   if(this.phase==='in'){
-   if(!reinforcementAnimationFinished(this.name,time-this.at))return hit
+   if(!this.finished(this.name,time))return hit
    this.phase='hit';this.name='attack_loop';this.at=time
   }
   if(this.phase==='hit'){
@@ -31,11 +33,11 @@ export class SpecialReinforcementAttack {
    this.attackTs=this.started;hit=true;this.result=true;this.phase='loop'
   }
   if(this.phase==='loop'){
-   if(reinforcementAnimationFinished(this.name,time-this.at))out()
+   if(this.finished(this.name,time))out()
    else if(state.stunned)out()
    else if(state.dead||state.rally)finish()
   }
-  if(this.phase==='out'&&(reinforcementAnimationFinished(this.name,time-this.at)||state.dead||state.rally))finish()
+  if(this.phase==='out'&&(this.finished(this.name,time)||state.dead||state.rally))finish()
   return hit
  }
 }

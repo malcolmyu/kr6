@@ -17,7 +17,7 @@ local function clean(value,seen)
 end
 local out={}
 for name,template in pairs(E.entities) do
-  if name=='mod_archers_skill_c_weak' then out[name]=clean(template) end
+  if name=='mod_archers_skill_c_weak' or name:match('^mod_archers_skill_a_stun_lvl') then out[name]=clean(template) end
   if name=='aura_wizard_skill_c' or name=='controller_tower_wizard_book_bounce' or name=='explosion_small_KR5' or name=='aura_catapult_skill_c_trap' or name=='mod_catapult_skill_c_stun' or name=='aura_catapult_skill_a' or name=='mod_catapult_skill_a_slow' or name=='aura_catapult_skill_b_bomb' or name:match('^aura_bullet_power_rain_of_fire') or name:match('^mod_bullet_power_rain_of_fire') or name=='aura_power_reinforcement_special' or name:match('^mod_reinforcement_special_') or name:match('^enemy_') or name:match('^tower_') or name:match('^soldier_') or name:match('^decal_') or name:match('^bullet_') or name:match('^bolt_') or name:match('^fx_') or name:match('^power_') or name:match('^hero_') or name:match('^mod_power_royal_edict') or name:match('^mod_gerald_skill_[ab]$') or name:match('^mod_gerald_skill_c') or name=='mod_firebook_aura' or name=='mod_wizard_skill_b' or name=='mod_wizard_skill_b_fx' or name=='mod_archers_skill_b_range' or name:match('^aura_bullet_culverine') or name:match('^aura_zefira_skill_b') or name:match('^mod_zefira_skill_[abc]') or name:match('^mod_gerald_ultimate') or name=='aura_zefira_talent_1' or name=='mod_zefira_talent' or name=='aura_gerald_ultimate' or name:match('^pop_') or name=='pop_block' or name=='aura_gerald_talent_2_regeneration' or name=='aura_shadow_blades_smoke' or name=='mod_shadow_blades_smoke' or name=='controller_stage_01_gerald_intro' then
     out[name]=clean(template)
   end

@@ -1,3 +1,4 @@
+import {soldierIsDead} from './SoldierHealth.ts'
 import data from '../../public/data/enemy-ranged-runtime.json' with {type:'json'}
 import {luaSort} from './LuaSort.ts'
 import {nativeLogicAnimationFrame} from './NativeAnimation.ts'
@@ -33,7 +34,7 @@ export class EnemyRangedRuntime {
  constructor(owner:EnemyRangedCombat,random:()=>number){this.owner=owner;this.random=random}
  private canRange(e:EnemyInstance,t:SoldierInstance,a:EnemyRangedAttack){
   const vis=t.template.vis??{flags:1025,bans:0},bans=t.visBans??vis.bans,dx=t.pos.x-e.path.position.x,dy=t.pos.y-e.path.position.y,d=dx*dx+dy*dy/(.7*.7)
-  return e.hp>0&&!e.template.unit.is_stunned&&t.hp>0&&this.present(t)&&!(bans&a.vis_flags)&&!(vis.flags&a.vis_bans)&&d<=a.max_range**2&&(a.min_range===0||d>a.min_range**2)
+  return e.hp>0&&!e.template.unit.is_stunned&&!soldierIsDead(t)&&this.present(t)&&!(bans&a.vis_flags)&&!(vis.flags&a.vis_bans)&&d<=a.max_range**2&&(a.min_range===0||d>a.min_range**2)
  }
  private sprite(e:EnemyInstance,s:State,name:string,at:number,loop:boolean){s.spriteAt=at;s.animationAt=at;this.onSprite(e,{name,at,loop,facingLeft:s.facingLeft})}
  advanceEnemy(e:EnemyInstance,time:number):boolean{
@@ -77,7 +78,7 @@ export class EnemyRangedRuntime {
   if(p.doneAt!==undefined)return
   const t=p.target,offset=t.template.unit?.hit_offset??{x:0,y:0},hit={x:t.pos.x+offset.x,y:t.pos.y+offset.y}
   const done=p.motion.step(time-p.born,dt,hit);p.pos=p.motion.pos;p.rotation=p.motion.rotation;p.hidden=p.motion.hidden;if(!done)return
-  const b=data.bullet,valid=this.present(t)&&t.hp>0,close=valid&&Math.hypot(p.pos.x-hit.x,p.pos.y-hit.y)<b.hit_distance,dodged=close&&this.owner.dodges.check(t,time,true)
+  const b=data.bullet,valid=this.present(t)&&!soldierIsDead(t),close=valid&&Math.hypot(p.pos.x-hit.x,p.pos.y-hit.y)<b.hit_distance,dodged=close&&this.owner.dodges.check(t,time,true)
   if(close&&!dodged){
    const order=this.onCreateDamage();this.onDamage(p,bulletDamageValue(b.damage_min,b.damage_max,p.damageFactor,this.random),typeof order==='number'?order:undefined)
    if(b.hit_blood_fx&&t.template.unit?.blood_color!=='none')this.effect('fx',b.hit_blood_fx,hit,time,p.rotation,t.template.unit?.blood_color)
