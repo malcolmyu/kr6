@@ -47,7 +47,7 @@ import {SaveSlots} from './game/SaveSlots'
 const saveSlots=new SaveSlots(localStorage),slotEntries=ref(saveSlots.list())
 const debug=import.meta.env.DEV&&new URLSearchParams(location.search).get('debug')==='1'
 let progress=saveSlots.loadActive()??{levels:{}}
-function persistProgress(){saveSlots.saveActive(progress);slotEntries.value=saveSlots.list()}
+function persistProgress(){progress=saveSlots.saveActive(progress);slotEntries.value=saveSlots.list()}
 const heroRoomVisible=ref(false),heroRoomProgress=ref(progress)
 const powerRoomVisible=ref(false),globalRoomVisible=ref(false)
 function openGlobalRoom(){saveSessionProgress();heroRoomProgress.value=progress;globalRoomVisible.value=true}
@@ -214,7 +214,7 @@ onBeforeUnmount(() => {outcomePresentation.clear();saveSessionProgress();window.
       <GameHud v-if="hudData" v-show="!pauseVisible&&!status.guiHidden&&!outcomeHudHidden&&status.outcome?.kind!=='defeat'" :data="hudData" :lives="status.lives" :gold="status.gold" :wave="status.wave" :total-waves="world?.session?.waves.totalWaves??0" :paused="status.paused" :disabled="loading||!!status.outcome||!optionsArt" @pause="pause"/>
       <WaveFlags v-if="incomingWave&&!status.outcome&&!status.cinematic&&(!tutorial||tutorial.waveVisible)" :incoming="incomingWave" :entrances="waveEntrances" :project="project" :time="world?.session?.time??0" :scale="(world?.viewportHeight??768)/768" :zoom="world?.cameraZoom??1" :confirm="waveConfirm" :muted="!!selected||!!world?.session?.powers.selected||!!world?.heroSelected||!!world?.rallySelected" :disabled="loading||status.paused||!!status.outcome||!!tutorial?.inputLocked||!!selected||!!world?.session?.powers.selected||!!world?.heroSelected||!!world?.rallySelected" @call="nextWave"/>
       <div v-if="status.curtains" class="curtains" aria-label="剧情动画"/>
-      <HeroBar v-if="hudData" v-show="!pauseVisible&&!status.guiHidden&&!outcomeHudHidden&&status.outcome?.kind!=='defeat'" :data="hudData" :heroes="heroes" :powers="powers" :time="world?.session?.time??0" :disabled="loading||status.paused||!!status.outcome||!!status.cinematic||!!tutorial?.inputLocked" @hero="selectHero" @power="selectPower"/>
+      <HeroBar v-if="hudData" v-show="!pauseVisible&&!status.guiHidden&&!outcomeHudHidden&&status.outcome?.kind!=='defeat'" :data="hudData" :heroes="heroes" :powers="powers" :time="world?.session?.time??0" :disabled="loading||mapVisible||comicVisible||heroRoomVisible||powerRoomVisible||globalRoomVisible||transitionBusy||status.paused||!!status.outcome||!!status.cinematic||!!tutorial?.inputLocked" @hero="selectHero" @power="selectPower"/>
       <TutorialOverlay v-if="tutorial&&!pauseVisible" :balloon="tutorial.balloon" :focus="tutorial.focus" :balloons="balloons" :project="project" :viewport-height="world?.viewportHeight??0" :focus-settings="focusSettings"/>
       <TutorialOverlay v-else-if="heroBalloon&&!pauseVisible" :balloon="heroBalloon" :balloons="balloons" :project="project" :viewport-height="world?.viewportHeight??0" :focus-settings="focusSettings"/>
       <OutcomeView v-if="status.outcome&&outcomeVisible&&!comicVisible&&!mapVisible" :outcome="status.outcome" :iron="mode==='iron'" @restart="load(true)" @continue="continueOutcome" @ready="outcomeReady" @sound="audio.trigger($event)"/>

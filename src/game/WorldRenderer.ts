@@ -449,6 +449,7 @@ export class WorldRenderer {
         art.setOrder(...this.nativeOrder(config,site.pos,registered?.id??0,this.templates[key].render.sprites.indexOf(config)+1))
         if(retiring&&rendered.update){rendered.update(this.session.time);continue}
         const elapsed=site.building?Math.max(0,this.session.time-site.buildStartsAt!):this.session.time
+        if(site.building&&key===site.building&&this.templates[key].render.sprites.indexOf(config)===3){const duration=this.templates[key].build_duration??1;art.root.scale.x=Math.max(0,Math.min(1,elapsed/duration))}
         if(art instanceof ExoSprite) {
           if(site.tower?.startsWith('tower_catapult_')){
             const sid=this.templates[key].render.sprites.indexOf(config),part=this.session.combat.catapultTowers.states.get(site.id)?.parts[sid]

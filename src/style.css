@@ -5,3 +5,5 @@
 @font-face{font-family:KingdomChinese;src:url('/fonts/NotoSansCJKsc-Bold.otf') format('opentype');font-weight:700;font-display:swap}@font-face{font-family:KingdomTitle;src:url('/fonts/YIKES.ttf') format('truetype');font-display:swap}html body{font-family:KingdomChinese,sans-serif;font-weight:700}
 
 @font-face{font-family:KingdomChineseRegular;src:url('/fonts/NotoSansCJKsc-Regular.otf') format('opentype');font-weight:400;font-display:swap}
+
+html,body,#app{-webkit-user-select:none;user-select:none}img,canvas{-webkit-user-drag:none}
