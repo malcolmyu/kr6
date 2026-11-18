@@ -1,3 +1,4 @@
+import {enemyBookIds,normalizeBookEnemy} from './EnemyBook.ts'
 import {supportedHeroes,parseHeroTeam,applyHeroProgression,heroStartingXp} from './HeroTeam.ts'
 import type {HeroKind} from './HeroTeam'
 import {validateGlobalUpgrades,globalUpgradeKinds,globalUpgradePoints} from './GlobalUpgrades.ts'
@@ -13,7 +14,7 @@ import {validatePowerUpgrades} from './PowerUpgrades.ts'
 import type {PowerUpgradeSelection} from './PowerUpgrades'
 export const PROGRESS_KEY='kingdom-rush-6.progress.v1'
 export type Introduction = 'stage1'|'stage2'|'comic2'
-export interface Progress {heroTeam?:HeroKind[];globalUpgrades?:GlobalUpgradeSelection;onboarding?:Partial<Record<Introduction,true>>;lastPlayed?:{stage:number;mode:GameMode};towers?:TowerLoadoutKind[];heroUpgrades?:Record<string,string[]>;powerUpgrades?:PowerUpgradeSelection;powers?:PowerKind[];powerXp?:Partial<Record<PowerKind,number>>;heroes?:Record<string,number>;levels:Record<string,{campaign?:number;iron?:boolean}>}
+export interface Progress {discoveredEnemies?:string[];heroTeam?:HeroKind[];globalUpgrades?:GlobalUpgradeSelection;onboarding?:Partial<Record<Introduction,true>>;lastPlayed?:{stage:number;mode:GameMode};towers?:TowerLoadoutKind[];heroUpgrades?:Record<string,string[]>;powerUpgrades?:PowerUpgradeSelection;powers?:PowerKind[];powerXp?:Partial<Record<PowerKind,number>>;heroes?:Record<string,number>;levels:Record<string,{campaign?:number;iron?:boolean}>}
 export function parseProgress(text:string|null):Progress {
   const result:Progress={levels:{}}
   if(!text)return result
@@ -23,6 +24,7 @@ export function parseProgress(text:string|null):Progress {
       result.onboarding={};for(const key of ['stage1','stage2','comic2'] as const)if(data.onboarding[key]===true)result.onboarding[key]=true
     }
     if(Number.isInteger(data?.lastPlayed?.stage)&&data.lastPlayed.stage>=1&&data.lastPlayed.stage<=3&&(data.lastPlayed.mode==='campaign'||data.lastPlayed.mode==='iron'))result.lastPlayed={stage:data.lastPlayed.stage,mode:data.lastPlayed.mode}
+    if(Array.isArray(data?.discoveredEnemies))result.discoveredEnemies=[...new Set<string>(data.discoveredEnemies.filter((n:unknown):n is string=>typeof n==='string').map(normalizeBookEnemy).filter((n:string)=>enemyBookIds.has(n)))]
     const heroTeam=parseHeroTeam(data?.heroTeam);if(heroTeam!==undefined)result.heroTeam=heroTeam
     const towers=parseTowerLoadout(data?.towers);if(towers!==undefined)result.towers=towers
     if(Array.isArray(data?.powers)){const powers=data.powers.filter((p:unknown)=>p==='reinforcements'||p==='rain_of_fire'||p==='royal_edict');if(powers.length===data.powers.length&&powers.length<=3&&new Set(powers).size===powers.length)result.powers=powers}

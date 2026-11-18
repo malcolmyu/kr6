@@ -245,3 +245,5 @@ assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_runtim
 assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_mortar.lua')==0)
 
 assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_mines.lua')==0)
+
+assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_enemy_book.lua')==0)

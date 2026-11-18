@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount,nextTick } from 'vue'
 import Opening from './Opening.vue'
+import EnemyBook from './EnemyBook.vue'
+import {recordDiscoveredEnemies} from './game/EnemyBook'
 import heroTeamData from '../public/data/hero-team.json' with {type:'json'}
 const heroDisplay:Record<string,{name:string;portrait:number}>=heroTeamData.heroes
 import PauseOptions from './PauseOptions.vue'
@@ -48,6 +50,8 @@ const saveSlots=new SaveSlots(localStorage),slotEntries=ref(saveSlots.list())
 const debug=import.meta.env.DEV&&new URLSearchParams(location.search).get('debug')==='1'
 let progress=saveSlots.loadActive()??{levels:{}}
 function persistProgress(){progress=saveSlots.saveActive(progress);slotEntries.value=saveSlots.list()}
+const enemyBookVisible=ref(false)
+function openEnemyBook(){saveSessionProgress();heroRoomProgress.value=progress;enemyBookVisible.value=true}
 const heroRoomVisible=ref(false),heroRoomProgress=ref(progress)
 const powerRoomVisible=ref(false),globalRoomVisible=ref(false)
 function openGlobalRoom(){saveSessionProgress();heroRoomProgress.value=progress;globalRoomVisible.value=true}
@@ -96,7 +100,7 @@ const comicIndex=ref(1)
 const mapVisible=ref(false)
 const mapFocus=ref(1)
 let resolveMapReady:(()=>void)|undefined,rejectMapReady:((error:Error)=>void)|undefined,mapLoadProgress:((value:number)=>void)|undefined
-function mapReady(error?:string){if(error)rejectMapReady?.(new Error(error));else resolveMapReady?.();resolveMapReady=undefined;rejectMapReady=undefined}
+function mapReady(loadError?:string){if(loadError)rejectMapReady?.(new Error(loadError));else{error.value='';resolveMapReady?.()}resolveMapReady=undefined;rejectMapReady=undefined}
 async function prepareMap(report:(images:number,audio?:number)=>void,focus:number){report(0,1);clearOutcomePresentation();pauseVisible.value=false;comicVisible.value=false;mapFocus.value=focus;const alreadyVisible=mapVisible.value,ready=alreadyVisible?Promise.resolve():new Promise<void>((resolve,reject)=>{resolveMapReady=resolve;rejectMapReady=reject});mapLoadProgress=value=>report(value,1);mapVisible.value=true;audio.stopAll(['GUITransitionClose']);audio.trigger('MusicMap');musicStarted=true;await ready;mapLoadProgress=undefined}
 async function showMap(focus=level.value){return changeScene(report=>prepareMap(report,focus))}
 async function enterFromMap(stage:number,nextMode:GameMode){level.value=stage;mode.value=nextMode;await load()}
@@ -176,7 +180,7 @@ function createWorld(){
   world.onSiteSelect=site=>{if(site)world?.cancelRally();if(site&&selected.value?.id===site.id){cancelBuild();return}if(selected.value)selected.value.powerPreview=undefined;selected.value=site;buildError.value='';if(site)audio.trigger('GUIQuickMenuOpen')}
   world.onSound=(name,options)=>{if(name!=='GUIStageVictory'&&name!=='GUIStageDefeat')audio.trigger(name,options)}
   world.onStopSound=name=>audio.stopEvent(name)
-  world.onChange=()=>{const s=world?.session;if(s){if(s.time-lastXpSaveAt>=5)saveSessionProgress();heroBalloon.value=s.heroes.balloon;heroes.value=s.heroes.team.filter(h=>h.portraitVisible).map(h=>({id:h.id,name:heroDisplay[h.name].name,image:heroDisplay[h.name].portrait,hp:h.hp,maxHp:h.template.health.hp_max,level:h.level,xpFraction:heroXpFraction(h.level,h.xp),selected:!!world?.heroSelected&&s.heroes.selectedId===h.id}));incomingWave.value=s.incomingWave;powers.value=s.powers.equipped.map(kind=>[kind,({reinforcements:'援军',rain_of_fire:'火雨',royal_edict:'皇家敕令'} as Record<PowerKind,string>)[kind]] as [PowerKind,string]).filter(([kind])=>!s.tutorial || s.tutorial.unlockedPowers.has(kind)).map(([kind,name])=>({kind,name,remaining:s.powers.remaining(kind,s.time),cooldown:s.powers.cooldowns[kind],level:s.powers.progression.status[kind].level,xpFraction:powerXpFraction(s.powers.progression.xp(kind)),selected:s.powers.selected===kind,locked:!s.powers.canUse(kind)}));status.value={gold:s.gold,lives:s.lives,wave:s.waves.wave,paused:s.paused,cinematic:s.cinematic,guiHidden:s.heroes.guiHidden,curtains:s.heroes.curtains,outcome:s.outcome};const t=s.tutorial;tutorial.value=t?{inputLocked:t.inputLocked,waveVisible:t.waveVisible,balloon:t.balloon,focus:t.focus,lesson:t.lesson,buildComplete:t.buildComplete}:undefined;if(s.outcome && savedOutcome!==s.outcome){savedOutcome=s.outcome;outcomePresentation.begin(s.outcome.kind,()=>{if(world?.session===s)outcomeHudHidden.value=true},()=>{if(world?.session===s){s.paused=true;outcomeVisible.value=true;world.onChange()}});progress=recordPowerXp(recordHeroXp(recordVictory(progress,level.value,mode.value,s.outcome),s.heroes.team),s.powers.progression.snapshot());persistProgress()}}}
+  world.onChange=()=>{const s=world?.session;if(s){const discovered=recordDiscoveredEnemies(progress,s.enemies.map(e=>e.name));if(discovered!==progress){progress=discovered;persistProgress()}if(s.time-lastXpSaveAt>=5)saveSessionProgress();heroBalloon.value=s.heroes.balloon;heroes.value=s.heroes.team.filter(h=>h.portraitVisible).map(h=>({id:h.id,name:heroDisplay[h.name].name,image:heroDisplay[h.name].portrait,hp:h.hp,maxHp:h.template.health.hp_max,level:h.level,xpFraction:heroXpFraction(h.level,h.xp),selected:!!world?.heroSelected&&s.heroes.selectedId===h.id}));incomingWave.value=s.incomingWave;powers.value=s.powers.equipped.map(kind=>[kind,({reinforcements:'援军',rain_of_fire:'火雨',royal_edict:'皇家敕令'} as Record<PowerKind,string>)[kind]] as [PowerKind,string]).filter(([kind])=>!s.tutorial || s.tutorial.unlockedPowers.has(kind)).map(([kind,name])=>({kind,name,remaining:s.powers.remaining(kind,s.time),cooldown:s.powers.cooldowns[kind],level:s.powers.progression.status[kind].level,xpFraction:powerXpFraction(s.powers.progression.xp(kind)),selected:s.powers.selected===kind,locked:!s.powers.canUse(kind)}));status.value={gold:s.gold,lives:s.lives,wave:s.waves.wave,paused:s.paused,cinematic:s.cinematic,guiHidden:s.heroes.guiHidden,curtains:s.heroes.curtains,outcome:s.outcome};const t=s.tutorial;tutorial.value=t?{inputLocked:t.inputLocked,waveVisible:t.waveVisible,balloon:t.balloon,focus:t.focus,lesson:t.lesson,buildComplete:t.buildComplete}:undefined;if(s.outcome && savedOutcome!==s.outcome){savedOutcome=s.outcome;outcomePresentation.begin(s.outcome.kind,()=>{if(world?.session===s)outcomeHudHidden.value=true},()=>{if(world?.session===s){s.paused=true;outcomeVisible.value=true;world.onChange()}});progress=recordPowerXp(recordHeroXp(recordVictory(progress,level.value,mode.value,s.outcome),s.heroes.team),s.powers.progression.snapshot());persistProgress()}}}
 }
 async function selectSlot(index:number){
  if(transitionBusy.value)return
@@ -202,7 +206,8 @@ onBeforeUnmount(() => {outcomePresentation.clear();saveSessionProgress();window.
   <HeroRoom v-if="heroRoomVisible" :progress="heroRoomProgress" @close="heroRoomVisible=false" @purchase="saveHeroUpgrades" @sound="audio.trigger($event)"/>
   <GlobalRoom v-if="globalRoomVisible" :progress="heroRoomProgress" @close="globalRoomVisible=false" @purchase="saveGlobalUpgrades" @sound="audio.trigger($event)"/>
   <PowerRoom v-if="powerRoomVisible" :progress="heroRoomProgress" @close="powerRoomVisible=false" @purchase="savePowerUpgrades" @equip="savePowerEquipment" @sound="audio.trigger($event)"/>
-  <MapView v-if="mapVisible" :progress="progress" :focus="mapFocus" @enter="enterFromMap" @heroes="openHeroRoom" @powers="openPowerRoom" @upgrades="openGlobalRoom" @ready="mapReady" @loading="mapLoadProgress?.($event)" @sound="audio.trigger($event)"/>
+  <EnemyBook v-if="enemyBookVisible" :progress="heroRoomProgress" @close="enemyBookVisible=false" @sound="audio.trigger($event)"/>
+  <MapView v-if="mapVisible" :progress="progress" :focus="mapFocus" @enter="enterFromMap" @encyclopedia="openEnemyBook" @heroes="openHeroRoom" @powers="openPowerRoom" @upgrades="openGlobalRoom" @ready="mapReady" @loading="mapLoadProgress?.($event)" @sound="audio.trigger($event)"/>
   <Comic v-if="comicVisible" :index="comicIndex" @done="finishComic" @sound="audio.trigger($event)"/>
   <Opening v-if="screen==='opening'" :begin="startOpening" :slots="slotEntries" @menu="startMenu" @select="selectSlot" @delete="deleteSlot" @sound="audio.trigger($event)"/>
   <main v-else class="game-shell" :class="{'debug-shell':debug}">
@@ -214,7 +219,7 @@ onBeforeUnmount(() => {outcomePresentation.clear();saveSessionProgress();window.
       <GameHud v-if="hudData" v-show="!pauseVisible&&!status.guiHidden&&!outcomeHudHidden&&status.outcome?.kind!=='defeat'" :data="hudData" :lives="status.lives" :gold="status.gold" :wave="status.wave" :total-waves="world?.session?.waves.totalWaves??0" :paused="status.paused" :disabled="loading||!!status.outcome||!optionsArt" @pause="pause"/>
       <WaveFlags v-if="incomingWave&&!status.outcome&&!status.cinematic&&(!tutorial||tutorial.waveVisible)" :incoming="incomingWave" :entrances="waveEntrances" :project="project" :time="world?.session?.time??0" :scale="(world?.viewportHeight??768)/768" :zoom="world?.cameraZoom??1" :confirm="waveConfirm" :muted="!!selected||!!world?.session?.powers.selected||!!world?.heroSelected||!!world?.rallySelected" :disabled="loading||status.paused||!!status.outcome||!!tutorial?.inputLocked||!!selected||!!world?.session?.powers.selected||!!world?.heroSelected||!!world?.rallySelected" @call="nextWave"/>
       <div v-if="status.curtains" class="curtains" aria-label="剧情动画"/>
-      <HeroBar v-if="hudData" v-show="!pauseVisible&&!status.guiHidden&&!outcomeHudHidden&&status.outcome?.kind!=='defeat'" :data="hudData" :heroes="heroes" :powers="powers" :time="world?.session?.time??0" :disabled="loading||mapVisible||comicVisible||heroRoomVisible||powerRoomVisible||globalRoomVisible||transitionBusy||status.paused||!!status.outcome||!!status.cinematic||!!tutorial?.inputLocked" @hero="selectHero" @power="selectPower"/>
+      <HeroBar v-if="hudData" v-show="!pauseVisible&&!status.guiHidden&&!outcomeHudHidden&&status.outcome?.kind!=='defeat'" :data="hudData" :heroes="heroes" :powers="powers" :time="world?.session?.time??0" :disabled="loading||mapVisible||comicVisible||enemyBookVisible||heroRoomVisible||powerRoomVisible||globalRoomVisible||transitionBusy||status.paused||!!status.outcome||!!status.cinematic||!!tutorial?.inputLocked" @hero="selectHero" @power="selectPower"/>
       <TutorialOverlay v-if="tutorial&&!pauseVisible" :balloon="tutorial.balloon" :focus="tutorial.focus" :balloons="balloons" :project="project" :viewport-height="world?.viewportHeight??0" :focus-settings="focusSettings"/>
       <TutorialOverlay v-else-if="heroBalloon&&!pauseVisible" :balloon="heroBalloon" :balloons="balloons" :project="project" :viewport-height="world?.viewportHeight??0" :focus-settings="focusSettings"/>
       <OutcomeView v-if="status.outcome&&outcomeVisible&&!comicVisible&&!mapVisible" :outcome="status.outcome" :iron="mode==='iron'" @restart="load(true)" @continue="continueOutcome" @ready="outcomeReady" @sound="audio.trigger($event)"/>
