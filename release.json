@@ -1,1 +1,1 @@
-{"sourceCommit": "2b4b171710c5f827aca443579624ddd7ea8868f0", "builtAt": "2026-11-18T17:21:06.697191+00:00", "fixes": ["save-recovery", "construction-progress", "hero-hotkeys", "disable-selection"]}
+{"sourceCommit": "8a1100cff49e31246e4a95fdeae791ef03d74f6b", "builtAt": "2026-11-18T18:14:33.862122+00:00", "fixes": ["map-load-recovery", "enemy-encyclopedia", "discovery-progress"]}
