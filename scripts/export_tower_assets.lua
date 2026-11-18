@@ -1,6 +1,6 @@
 local json=require('dkjson')
 local exos,atlas,textures,animations={},{},{},{}
-for _,group in ipairs({'go_enemies_T1','go_commons','go_towers','go_towers_archers','go_towers_wizard','go_towers_knights','go_towers_catapult','go_towers_culverine','go_decals','go_power_reinforcements','go_power_rain_of_fire','go_power_royal_edict','go_hero_gerald','go_hero_zefira'}) do
+for _,group in ipairs({'go_enemies_T1','go_commons','go_towers','go_towers_archers','go_towers_wizard','go_towers_knights','go_towers_catapult','go_towers_culverine','go_decals','go_power_reinforcements','go_power_rain_of_fire','go_power_royal_edict','go_hero_gerald','go_hero_zefira','go_hero_bolin'}) do
   for name,frame in pairs(dofile('runtime/desktop_assets/kr6-phone/images/ipadhd/'..group..'.lua')) do
     atlas[name]=frame;textures[frame.a_name]=true
   end

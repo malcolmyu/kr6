@@ -45,7 +45,7 @@ export class AudioManager {
     if(!definition)throw new Error(`Missing original audio event ${name}`)
     await Promise.all(definition.files.map(file=>this.buffer(file)))
   }
-  async play(name:string):Promise<void>{
+  async play(name:string,options?:{delay?:number}):Promise<void>{
     if(!this.context || !this.data)return
     const definition=this.data.sounds[name]
     if(!definition)throw new Error(`Missing original audio event ${name}`)
@@ -66,12 +66,12 @@ export class AudioManager {
     const rate=this.choose(definition.pitch,1),gain=this.context.createGain()
     gain.gain.value=this.choose(definition.gain,1)*(config?.gain_factor??1)
     gain.connect(group==='MUSIC'?this.musicBus!:this.fxBus!)
-    const at=Math.max(this.context.currentTime,requestedAt+(definition.delay??0))
+    const at=Math.max(this.context.currentTime,requestedAt+(options?.delay??definition.delay??0))
     const voice:Voice={name,gain,group,buffer:decoded,rate,loop:definition.loop??false,offset:0,startAt:at,delay:0,paused:false};this.voices.push(voice)
     this.startVoice(voice,at)
 
   }
-  trigger(name:string|undefined){if(name)void this.play(name).catch(e=>this.onError(String(e)))}
+  trigger(name:string|undefined,options?:{delay?:number}){if(name)void this.play(name,options).catch(e=>this.onError(String(e)))}
   stopEvent(name:string){this.eventGeneration.set(name,(this.eventGeneration.get(name)??0)+1);for(const voice of [...this.voices])if(voice.name===name)this.stopVoice(voice)}
   stopGroup(group:string){for(const voice of [...this.voices])if(voice.group===group)this.stopVoice(voice)}
   private stopVoice(voice:Voice){const node=voice.node;voice.node=undefined;if(node){node.onended=null;node.stop();node.disconnect()}voice.gain.disconnect();this.voices=this.voices.filter(v=>v!==voice)}

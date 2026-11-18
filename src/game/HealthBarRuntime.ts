@@ -11,7 +11,8 @@ export class HealthBarRuntime {
   this.frames.clear()
   const units=[...session.enemies.map(e=>({source:e,hp:e.hp,max:Array.isArray(e.template.health.hp_max)?e.template.health.hp_max[1]:e.template.health.hp_max,pos:e.path.position,config:(e.template as unknown as {health_bar?:HealthBarConfig}).health_bar,hidden:e.diedAt!==undefined||e.escapedAt!==undefined&&!session.entities||e.teleportHidden})),...session.barracks.soldiers.map(s=>({source:s,hp:s.hp,max:s.template.health.hp_max,pos:s.pos,config:(s.template as unknown as {health_bar?:HealthBarConfig}).health_bar,hidden:s.healthBarHidden}))]
   for(const u of units){
-   if(!u.config||u.hp<=0)continue
+   // Native render keeps frames until the entity or its bar is hidden/removed.
+   if(!u.config||u.hp<=0&&!session.entities)continue
    const entity=session.entities?.entity(u.source)
    if(session.entities&&(!entity||!session.entities.registry.entities.get(entity.id)))continue
    let bar=this.states.get(u.source)

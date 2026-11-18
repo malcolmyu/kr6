@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict'
+export function assertSulfurFrame(g,f,ctx){
+ const near=(a,b,k)=>assert(Math.abs(a-b)<1e-10,`${ctx}/${k}: ${a} != ${b}`)
+ let states=0
+ for(const site of g.towers.sites){const s=g.combat.culverineTowers.states.get(site.id),a=f.entities.find(e=>e.id===g.entities.entity(site)?.id);if(s&&a?.culverineTimedAttacks)for(const [i,t]of s.timedAttacks.entries())for(const key of ['ts','bullet','cooldown','disabled'])assert.equal(t[key],a.culverineTimedAttacks[i][key],ctx+'/timed '+i+'/'+key)}
+ const runtime=g.sulfur
+ assert.equal(runtime.areas.size,f.entities.filter(e=>e.template.startsWith('aura_bullet_culverine_skill_a')).length,ctx+'/area collection')
+ assert.equal(runtime.modifiers.size,f.entities.filter(e=>e.template.startsWith('mod_bullet_culverine_skill_a')).length,ctx+'/modifier collection')
+ assert.equal(runtime.decals.size,f.entities.filter(e=>e.template.startsWith('decal_bullet_culverine_skill_a')).length,ctx+'/smoke collection')
+ for(const m of [...runtime.areas,...runtime.modifiers,...runtime.decals]){const a=f.entities.find(e=>e.id===g.entities.entity(m)?.id);assert(a,ctx+'/registered sulfur');for(const axis of ['x','y'])near(m.pos[axis],a.pos[axis],'position');if(m.kind==='area'){assert.equal(m.at,a.auraTs,ctx+'/area clock');assert.equal(m.duration,a.sulfurDuration,ctx+'/area duration');assert.equal(m.level,a.auraLevel)}else if(m.kind==='modifier'){assert.equal(m.at,a.modifierTs,ctx+'/modifier clock');assert.equal(m.level,a.modifierLevel);assert.equal(m.targetId,a.modifierTarget);assert.equal(m.sourceId,a.modifierSource);assert.equal(m.lost,a.sulfurLost)}else{assert.equal(m.born,a.spriteTs,ctx+'/smoke sprite clock');assert.equal(m.alpha,a.spriteAlpha,ctx+'/smoke opacity');assert.equal(m.fading,!a.nativeTween.disabled);if(m.fading)assert.equal(m.tweenAt,a.nativeTween.ts)}states++}
+ for(const p of g.combat.projectiles.filter(p=>p.name.startsWith('bullet_culverine_skill_a'))){const a=f.entities.find(e=>e.id===g.entities.entity(p)?.id);if(!a){assert(f.inserts.includes(g.entities.entity(p)?.id),ctx+'/unregistered bullet');continue}assert.equal(p.born,a.bullet.ts,ctx+'/bomb clock');for(const axis of ['x','y']){near(p.pos[axis],a.pos[axis],'bomb position');near(p.bombMotion.speed[axis],a.bullet.speed[axis],'bomb velocity');near(p.to[axis],a.bullet.to[axis],'bomb target')}near(p.bombMotion.rotation,a.rotation,'bomb rotation');assert.equal(p.bombMotion.hidden,a.bullet.hidden);assert.equal(p.nativeVisual.z,a.spriteZ);assert.equal(p.nativeVisual.sort_y_offset,a.spriteSortY);states++}
+ for(const e of g.enemies){const a=f.entities.find(a=>a.id===g.entities.entity(e)?.id);if(a){assert.equal(e.template.health.magic_armor,a.magicArmor,ctx+'/magic armor');assert.equal(e.template.health.raw_magic_armor,a.rawMagicArmor,ctx+'/raw magic armor')}}
+ return states
+}

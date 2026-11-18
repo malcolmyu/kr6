@@ -27,7 +27,7 @@ try{
    advance.call(this,dt)
    if(f){
     if(f.moving&&this.time>at){f.movements.push({dt:this.time-at,dx:f.enemy.path.position.x-x,speed:f.enemy.template.motion.max_speed});if(f.movements.length>=12){f.moving=false;f.enemy.skillLocked=true}}
-    const {site,enemy,shots}=f,state=this.combat.catapultTowers.states.get('8');window.tarObservation={time:this.time,power:site.powerLevels?.skill_a??0,parts:state?.parts,areas:this.combat.catapultTar.areas.map(a=>({...a})),slowLevel:this.combat.catapultTar.slows.get(enemy.id)?.level,speed:enemy.template.motion.max_speed,shots:[...shots],hp:enemy.hp,gold:this.gold}
+    const {site,enemy,shots}=f,state=this.combat.catapultTowers.states.get('8');window.tarObservation={time:this.time,power:site.powerLevels?.skill_a??0,parts:state?.parts,areas:[...this.combat.nativeTar.areas].map(a=>({...a})),slowLevel:[...this.combat.nativeTar.slows].find(s=>s.enemy===enemy)?.level,speed:enemy.template.motion.max_speed,shots:[...shots],hp:enemy.hp,gold:this.gold}
    }
   }
  })

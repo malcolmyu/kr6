@@ -1,3 +1,5 @@
+import {supportedHeroes,parseHeroTeam,applyHeroProgression,heroStartingXp} from './HeroTeam.ts'
+import type {HeroKind} from './HeroTeam'
 import {validateGlobalUpgrades,globalUpgradeKinds,globalUpgradePoints} from './GlobalUpgrades.ts'
 import type {GlobalUpgradeSelection} from './GlobalUpgrades'
 import {heroUpgradeData,validateHeroUpgrades} from './HeroUpgrades.ts'
@@ -11,7 +13,7 @@ import {validatePowerUpgrades} from './PowerUpgrades.ts'
 import type {PowerUpgradeSelection} from './PowerUpgrades'
 export const PROGRESS_KEY='kingdom-rush-6.progress.v1'
 export type Introduction = 'stage1'|'stage2'|'comic2'
-export interface Progress {globalUpgrades?:GlobalUpgradeSelection;onboarding?:Partial<Record<Introduction,true>>;lastPlayed?:{stage:number;mode:GameMode};towers?:TowerLoadoutKind[];heroUpgrades?:Record<string,string[]>;powerUpgrades?:PowerUpgradeSelection;powers?:PowerKind[];powerXp?:Partial<Record<PowerKind,number>>;heroes?:Record<string,number>;levels:Record<string,{campaign?:number;iron?:boolean}>}
+export interface Progress {heroTeam?:HeroKind[];globalUpgrades?:GlobalUpgradeSelection;onboarding?:Partial<Record<Introduction,true>>;lastPlayed?:{stage:number;mode:GameMode};towers?:TowerLoadoutKind[];heroUpgrades?:Record<string,string[]>;powerUpgrades?:PowerUpgradeSelection;powers?:PowerKind[];powerXp?:Partial<Record<PowerKind,number>>;heroes?:Record<string,number>;levels:Record<string,{campaign?:number;iron?:boolean}>}
 export function parseProgress(text:string|null):Progress {
   const result:Progress={levels:{}}
   if(!text)return result
@@ -21,6 +23,7 @@ export function parseProgress(text:string|null):Progress {
       result.onboarding={};for(const key of ['stage1','stage2','comic2'] as const)if(data.onboarding[key]===true)result.onboarding[key]=true
     }
     if(Number.isInteger(data?.lastPlayed?.stage)&&data.lastPlayed.stage>=1&&data.lastPlayed.stage<=3&&(data.lastPlayed.mode==='campaign'||data.lastPlayed.mode==='iron'))result.lastPlayed={stage:data.lastPlayed.stage,mode:data.lastPlayed.mode}
+    const heroTeam=parseHeroTeam(data?.heroTeam);if(heroTeam!==undefined)result.heroTeam=heroTeam
     const towers=parseTowerLoadout(data?.towers);if(towers!==undefined)result.towers=towers
     if(Array.isArray(data?.powers)){const powers=data.powers.filter((p:unknown)=>p==='reinforcements'||p==='rain_of_fire'||p==='royal_edict');if(powers.length===data.powers.length&&powers.length<=3&&new Set(powers).size===powers.length)result.powers=powers}
     const powerXp:Partial<Record<PowerKind,number>>={}
@@ -30,10 +33,10 @@ export function parseProgress(text:string|null):Progress {
     for(const kind of ['reinforcements','rain_of_fire','royal_edict'] as const){const nodes=data?.powerUpgrades?.[kind];if(Array.isArray(nodes))powerUpgrades[kind]=validatePowerUpgrades(kind,powerXp[kind]??0,nodes.filter((id:unknown):id is string=>typeof id==='string'))}
     if(Object.keys(powerUpgrades).length)result.powerUpgrades=powerUpgrades
     const heroes:Record<string,number>={}
-    for(const name of ['hero_gerald','hero_zefira']){const xp=data?.heroes?.[name];if(typeof xp==='number' && Number.isFinite(xp) && xp>=0)heroes[name]=xp}
+    for(const name of supportedHeroes){const xp=data?.heroes?.[name];if(typeof xp==='number' && Number.isFinite(xp) && xp>=0)heroes[name]=xp}
     if(Object.keys(heroes).length)result.heroes=heroes
     const heroUpgrades:Record<string,string[]>={}
-    for(const name of ['hero_gerald','hero_zefira']){const nodes=data?.heroUpgrades?.[name];if(Array.isArray(nodes))heroUpgrades[name]=validateHeroUpgrades(heroUpgradeData,name,heroes[name]??0,nodes.filter((id:unknown):id is string=>typeof id==='string'))}
+    for(const name of supportedHeroes){const nodes=data?.heroUpgrades?.[name];if(Array.isArray(nodes))heroUpgrades[name]=validateHeroUpgrades(heroUpgradeData,name,Math.max(heroes[name]??0,heroStartingXp(name)),nodes.filter((id:unknown):id is string=>typeof id==='string'))}
     if(Object.keys(heroUpgrades).length)result.heroUpgrades=heroUpgrades
     for(let stage=1;stage<=3;stage++) {
       const entry=data?.levels?.[stage]
@@ -52,7 +55,7 @@ export function recordVictory(progress:Progress,stage:number,mode:GameMode,outco
   const entry={...progress.levels[stage]}
   if(mode==='campaign')entry.campaign=Math.max(entry.campaign??0,outcome.stars)
   else entry.iron=true
-  return applyTowerProgression(progress,applyPowerProgression(progress,{...progress,levels:{...progress.levels,[stage]:entry}}))
+  return applyHeroProgression(progress,applyTowerProgression(progress,applyPowerProgression(progress,{...progress,levels:{...progress.levels,[stage]:entry}})))
 }
 
 export function recordHeroXp(progress:Progress,team:{name:string;xp:number}[]):Progress {

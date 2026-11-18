@@ -1,3 +1,6 @@
+import {CatapultTrapsRuntime} from './CatapultTrapsRuntime.ts'
+import {CatapultBombRuntime} from './CatapultBombRuntime.ts'
+import {CatapultTarRuntime} from './CatapultTarRuntime.ts'
 import {CulverineNativeRuntime} from './CulverineNativeRuntime.ts'
 import {nativeLogicAnimationFrame} from './NativeAnimation.ts'
 import {luaSort} from './LuaSort.ts'
@@ -42,7 +45,7 @@ export interface CombatTemplate {
   force_motion?:BoltMotionConfig['force_motion']
   initial_impulse?:number;initial_impulse_duration?:number;initial_impulse_angle_abs?:number
 }
-export interface Projectile {registryBound?:boolean;removalQueued?:boolean;nativePsCreated?:boolean;trajectoryLastPos?:Point;hidden?:boolean;hitAt?:number;lingerDuration?:number;removeNext?:boolean;damageMin?:number;damageMax?:number;source?:string;level?:number;id:number;name:string;born:number;duration:number;from:Point;to:Point;pos:Point;target?:EnemyInstance;done:boolean;rotation:number;motion?:BoltMotion;tracking?:boolean;fixedDamage?:number;damageFactor?:number;reduceArmor?:number;bombMotion?:CatapultMotion;arrowMotion?:EnemyArrowMotion}
+export interface Projectile {nativeVisual?:{z:number;sort_y_offset:number};registryBound?:boolean;removalQueued?:boolean;nativePsCreated?:boolean;trajectoryLastPos?:Point;hidden?:boolean;hitAt?:number;lingerDuration?:number;removeNext?:boolean;damageMin?:number;damageMax?:number;sourceId?:number;source?:string;level?:number;id:number;name:string;born:number;duration:number;from:Point;to:Point;pos:Point;target?:EnemyInstance;done:boolean;rotation:number;motion?:BoltMotion;tracking?:boolean;fixedDamage?:number;damageFactor?:number;reduceArmor?:number;bombMotion?:CatapultMotion;arrowMotion?:EnemyArrowMotion}
 export interface ShootingState {readyAt:number;startedAt:number;firesAt?:number;target?:EnemyInstance;facingBack:boolean;archerTs?:number;shooterIndex?:number;archers?:Map<number,ArcherState>}
 interface ArrowShot {name:string;from:Point;to:Point;target:EnemyInstance;predict:boolean;factor:number;reduceArmor:number;queuedAt:number}
 export class RangedCombat {
@@ -61,13 +64,15 @@ export class RangedCombat {
   private pendingArrows=new Map<object,ArrowShot>()
   onQueueProjectile:(shot:object,name:string,time:number)=>void=()=>{}
   onInsertProjectile:(shot:object,projectile:Projectile)=>void=()=>{}
+  onSulfurDecal:(name:string,pos:Point,time:number)=>void=()=>{}
+  onSulfurLanded:(name:string,pos:Point,level:number)=>void=()=>{}
   onParticleCreate:(name:string,time:number,projectile:Projectile)=>void=()=>{}
   onRemoveProjectile:(projectile:Projectile)=>void=()=>{}
   onMainComplete:()=>void=()=>{}
   onDamageCreate:()=>number|void=()=>{}
   onEffectCreate:(name:string,time:number,pos:Point,transform?:{rotation?:number;flipX?:boolean})=>void=()=>{}
 
-  onSound:(name:string)=>void=()=>{}
+  onSound:(name:string,options?:{delay?:number})=>void=()=>{}
   projectileTargetPresent:(enemy:EnemyInstance,pool:EnemyInstance[])=>boolean=(enemy,pool)=>pool.includes(enemy)
   targetValid:(enemy:EnemyInstance)=>boolean=()=>true
   predictTarget:(enemy:EnemyInstance,seconds:number)=>{pos:Point;valid:boolean}=(enemy,seconds)=>({pos:enemy.path.predict(enemy.blocked||enemy.meleeHolding||enemy.frozen||enemy.rangedHolding||enemy.skillLocked?0:enemy.template.motion.max_speed*seconds),valid:this.targetValid(enemy)})
@@ -80,6 +85,9 @@ export class RangedCombat {
   readonly wizardTowers:WizardTowerSystem
   readonly catapultTowers:CatapultTowerSystem
   readonly catapultBombs:CatapultBombSystem
+  readonly nativeTraps:CatapultTrapsRuntime
+  readonly nativeBombs:CatapultBombRuntime
+  readonly nativeTar:CatapultTarRuntime
   readonly catapultTar:CatapultTarSystem
   deferParticlePhase=false
   private particleSources:Projectile[]=[]
@@ -87,7 +95,7 @@ export class RangedCombat {
   readonly firebook:WizardFirebookSystem
   readonly catapultTraps:CatapultTraps
   private pendingWizardShots:{name:string;from:Point;to:Point;targetId?:number;factor:number;sign:number;plain?:boolean;damageMin?:number;damageMax?:number}[]=[]
-  private pendingCatapultShots:{source?:string;name:string;from:Point;to:Point;factor:number;level:number;damageMin?:number;damageMax?:number}[]=[]
+  private pendingCatapultShots:{nativeVisual?:{z:number;sort_y_offset:number};sourceId?:number;source?:string;name:string;from:Point;to:Point;factor:number;level:number;damageMin?:number;damageMax?:number}[]=[]
   readonly shooters=new Map<string,ShootingState>()
   readonly archerPierceCaster?:ArcherPierceCaster
   readonly archerPierceRays:ArcherPierceRaySystem
@@ -111,14 +119,26 @@ export class RangedCombat {
     this.firebookTrails=new FirebookTrailSystem(random)
     this.firebook=new WizardFirebookSystem(templates.mod_firebook_aura as unknown as ConstructorParameters<typeof WizardFirebookSystem>[0],random)
     this.firebook.onDamage=(enemy,damage)=>this.queueHit({enemy,damage})
+    this.nativeTraps=new CatapultTrapsRuntime(templates,random)
+    this.nativeTraps.candidates=(pos,radius)=>this.enemyCandidates(this.currentEnemies,pos,radius)
+    this.nativeTraps.valid=e=>this.targetValid(e)
+    this.nativeTraps.onCreateDamage=()=>{this.onDamageCreate()}
+    this.nativeTraps.onDamage=(enemy,value,type)=>this.queueNativeDamage(enemy,{value,damage_type:type},true)
+    this.nativeTraps.onSound=name=>this.onSound(name)
+    this.nativeBombs=new CatapultBombRuntime(templates.aura_catapult_skill_b_bomb)
+    this.nativeBombs.candidates=(pos,radius)=>this.enemyCandidates(this.currentEnemies,pos,radius)
+    this.nativeBombs.valid=e=>this.targetValid(e)
+    this.nativeBombs.onDamage=(enemy,value,type)=>this.queueNativeDamage(enemy,{value,damage_type:type})
+    this.nativeBombs.onSound=name=>this.onSound(name)
+    this.nativeTar=new CatapultTarRuntime(templates)
     this.catapultTar=new CatapultTarSystem(templates)
     this.catapultTraps=new CatapultTraps(templates,random,onKill)
     this.catapultTraps.onSound=name=>this.onSound(name);this.catapultTraps.targetValid=e=>this.targetValid(e)
     this.catapultBombs=new CatapultBombSystem(templates.aura_catapult_skill_b_bomb as unknown as ConstructorParameters<typeof CatapultBombSystem>[0],onKill)
     this.catapultBombs.onSound=name=>this.onSound(name);this.catapultBombs.targetValid=e=>this.targetValid(e)
     this.catapultTowers=new CatapultTowerSystem(templates as unknown as ConstructorParameters<typeof CatapultTowerSystem>[0])
-    this.catapultTowers.onShoot=(site,name,from,to,factor,time,level)=>{const shot={source:catapultOwner(site),name,from,to,factor,level};this.pendingCatapultShots.push(shot);this.onQueueProjectile(shot,name,time)}
-    this.catapultTowers.trapCount=site=>this.catapultTraps.count(site)
+    this.catapultTowers.onShoot=(site,name,from,to,factor,time,level)=>{const shot={sourceId:this.nativeTraps.id(site),source:catapultOwner(site),name,from,to,factor,level};this.pendingCatapultShots.push(shot);this.onQueueProjectile(shot,name,time)}
+    this.catapultTowers.trapCount=site=>(this.deferArcherControllers?this.nativeTraps:this.catapultTraps).count(site)
     this.wizardTowers=new WizardTowerSystem(templates as unknown as ConstructorParameters<typeof WizardTowerSystem>[0],wizardTimes,random)
     this.wizardTowers.onCopies=(_site,name,from,to,targetId,level,min,max,time)=>{const shot={name,from,to,targetId:Number(targetId),level,min,max,queuedAt:time};this.pendingCopies.set(shot,shot);this.onQueueProjectile(shot,name,time)}
     this.wizardTowers.onFirebook=(_site,name,from,to,_target,level,damageMin,damageMax,time)=>{const shot={name,from,to:{...to},level,damageMin,damageMax,factor:1};this.pendingCatapultShots.push(shot);this.onQueueProjectile(shot,name,time)}
@@ -132,7 +152,10 @@ export class RangedCombat {
     this.culverineRays.targetValid=e=>this.targetValid(e)
     this.culverineRays.onEffect=(name,pos,time)=>this.effect(name,pos,time)
     this.culverineTowers=new CulverineTowerSystem(templates as unknown as ConstructorParameters<typeof CulverineTowerSystem>[0],random)
-    this.culverineTowers.onSound=name=>this.onSound(name)
+    this.culverineTowers.onSound=(name,options)=>this.onSound(name,options)
+    this.culverineTowers.findThrottle=(site,seconds)=>this.catapultTargets(site,this.currentEnemies,seconds,undefined,0,128).map(t=>({enemy:t.enemy,point:t.predicted.pos}))
+    this.culverineTowers.findSulfur=(site,seconds)=>this.catapultTargets(site,this.currentEnemies,seconds,undefined,2056,1408).map(t=>({enemy:t.enemy,point:t.predicted.pos}))
+    this.culverineTowers.onSulfurShoot=(name,from,to,factor,time,nativeVisual)=>{const shot={name,from,to:{...to},factor,level:0,nativeVisual};this.pendingCatapultShots.push(shot);this.onQueueProjectile(shot,name,time)}
     this.culverineTowers.onShoot=(name,from,to,target,factor,time,site)=>{if(this.deferArcherControllers)this.nativeCulverine.queue(name,from,to,target,site,factor,time);else this.culverineRays.launch(name,from,to,target,undefined,factor,time)}
   }
   reserveCopiesProjectile(name:string){const model={};this.onAllocateProjectile(model,name);return model}
@@ -152,9 +175,9 @@ export class RangedCombat {
   /** Wizard filter17993 validates the attack forecast. FFE's separate prediction
    * argument is numeric zero: truthy in Lua, so range uses the current path node. */
   enemyCandidates:(pool:EnemyInstance[],at:Point,radius:number)=>EnemyInstance[]=(pool)=>pool
-  catapultTargets(site:TowerSite,enemies:EnemyInstance[],seconds:number,direction?:number,visFlags?:number){
+  catapultTargets(site:TowerSite,enemies:EnemyInstance[],seconds:number,direction?:number,visFlags?:number,visBans?:number){
     const t=this.templates[site.tower!],a=t.attacks!.list[0],o=t.tower!.range_offset,origin={x:site.pos.x+o.x,y:site.pos.y+o.y},range=t.attacks!.range*(site.rangeFactor??1)
-    return luaSort(this.enemyCandidates(enemies,origin,range+seconds*150).filter(e=>!enemyIsDead(e)&&!e.path.finished&&!((e.frozen?4096:e.template.vis.flags)&(site.attackBansOverride??a.vis_bans))&&!(e.template.vis.bans&(visFlags??a.vis_flags))).map(enemy=>({enemy,predicted:this.predictTarget(enemy,seconds)})).filter(({enemy,predicted})=>predicted.valid&&(predicted.pos.x-origin.x)**2+((predicted.pos.y-origin.y)/.7)**2<=range*range&&(direction===undefined||catapultDirection(origin,this.predictTarget(enemy,this.templates[a.bullet].bullet!.flight_time).pos)===direction)),(a,b)=>a.enemy.path.remainingNodes<b.enemy.path.remainingNodes)
+    return luaSort(this.enemyCandidates(enemies,origin,range+seconds*150).filter(e=>!enemyIsDead(e)&&!e.path.finished&&!((e.frozen?4096:e.template.vis.flags)&(visBans??site.attackBansOverride??a.vis_bans))&&!(e.template.vis.bans&(visFlags??a.vis_flags))).map(enemy=>({enemy,predicted:this.predictTarget(enemy,seconds)})).filter(({enemy,predicted})=>predicted.valid&&(predicted.pos.x-origin.x)**2+((predicted.pos.y-origin.y)/.7)**2<=range*range&&(direction===undefined||catapultDirection(origin,this.predictTarget(enemy,this.templates[a.bullet].bullet!.flight_time).pos)===direction)),(a,b)=>a.enemy.path.remainingNodes<b.enemy.path.remainingNodes)
   }
   wizardTargets(site:TowerSite,enemies:EnemyInstance[],attackIndex=0){
     const t=this.templates[site.tower!],a=t.attacks!.list[attackIndex],o=t.tower!.range_offset,origin={x:site.pos.x+o.x,y:site.pos.y+o.y},range=t.attacks!.range*(site.rangeFactor??1)
@@ -298,8 +321,8 @@ export class RangedCombat {
       }
       projectile.done=true
       if(projectile.motion&&bullet.particles_name==='ps_tower_wizard_bolt_trail'){projectile.hidden=true;const wait=this.firebookTrails.stop(projectile.id);if(wait!==undefined){projectile.hitAt=time;projectile.lingerDuration=wait}}
-      const radialCandidates=bullet.mod==='mod_firebook_aura'?this.enemyCandidates(enemies,projectile.to,bullet.damage_radius):enemies
-      const targets=bullet.damage_radius>0?radialCandidates.filter(e=>e.hp>0 && this.targetValid(e) && !(e.template.vis.flags&(bullet.damage_bans??0)) && !(e.template.vis.bans&(bullet.damage_flags??0)) && (e.path.position.x-projectile.to.x)**2+(e.path.position.y-projectile.to.y)**2/(.7*.7)<=bullet.damage_radius**2):projectile.target?[projectile.target]:[]
+      const radialCandidates=bullet.mod==='mod_firebook_aura'||projectile.name.startsWith('bullet_culverine_skill_a')?this.enemyCandidates(enemies,projectile.to,bullet.damage_radius):enemies
+      const targets=projectile.bombMotion&&(projectile.damageMax??bullet.damage_max)<=0?[]:bullet.damage_radius>0?radialCandidates.filter(e=>e.hp>0 && this.targetValid(e) && !(e.template.vis.flags&(bullet.damage_bans??0)) && !(e.template.vis.bans&(bullet.damage_flags??0)) && (e.path.position.x-projectile.to.x)**2+(e.path.position.y-projectile.to.y)**2/(.7*.7)<=bullet.damage_radius**2):projectile.target?[projectile.target]:[]
       for(const enemy of targets) {
         if(enemyIsDead(enemy) || enemy.escapedAt!==undefined)continue
         if(!projectile.motion&&!bullet.damage_radius&&enemy.smokeDodgeUntil!==undefined&&time<=enemy.smokeDodgeUntil&&!enemy.template.unit.is_stunned)continue
@@ -314,12 +337,13 @@ export class RangedCombat {
       if(projectile.bombMotion)this.dodges?.showAt(projectile.pos,time,bullet.pop,bullet.pop_chance)
       const water=!!(this.cellAt(projectile.to)&2),hitFx=water&&bullet.hit_fx_water?bullet.hit_fx_water:bullet.hit_fx
       if(hitFx)this.effect(hitFx,projectile.to,time)
-      if(bullet.hit_decal&&!water)this.effect(bullet.hit_decal,projectile.to,time)
+      if(bullet.hit_decal&&!water){if(bullet.hit_decal.startsWith('decal_bullet_culverine_skill_a'))this.onSulfurDecal(bullet.hit_decal,projectile.to,time);else this.effect(bullet.hit_decal,projectile.to,time)}
       const hitSound=(!projectile.bombMotion||hitFx)?this.templates[projectile.name].sound_events?.[water&&bullet.hit_fx_water?'hit_water':'hit']:undefined;if(hitSound)this.onSound(hitSound)
+      if(bullet.hit_payload?.startsWith('aura_bullet_culverine_skill_a'))this.onSulfurLanded(bullet.hit_payload,projectile.to,projectile.level??0)
       if(bullet.hit_payload==='aura_wizard_skill_c')this.onCopiesLanded({...projectile.to},projectile.level??1,time)
-      if(bullet.hit_payload==='aura_catapult_skill_c_trap')this.catapultTraps.queue(projectile.to,projectile.level!,projectile.source)
-      if(bullet.hit_payload==='aura_catapult_skill_a')this.catapultTar.queue(projectile.to,projectile.level!)
-      if(bullet.hit_payload==='aura_catapult_skill_b_bomb')this.catapultBombs.queue(projectile.to,projectile.level!)
+      if(bullet.hit_payload==='aura_catapult_skill_c_trap'){if(this.deferArcherControllers)this.nativeTraps.queue(projectile.to,projectile.level!,projectile.sourceId);else this.catapultTraps.queue(projectile.to,projectile.level!,projectile.source)}
+      if(bullet.hit_payload==='aura_catapult_skill_a')(this.deferArcherControllers?this.nativeTar:this.catapultTar).queue(projectile.to,projectile.level!)
+      if(bullet.hit_payload==='aura_catapult_skill_b_bomb')(this.deferArcherControllers?this.nativeBombs:this.catapultBombs).queue(projectile.to,projectile.level!)
     }
   }
   /** Native particle_system is after all main scripts. Keep the just-finished
@@ -443,10 +467,11 @@ export class RangedCombat {
       this.pendingCatapultShots.splice(this.pendingCatapultShots.indexOf(catapult),1)
       const shot=catapult
       const template=this.templates[shot.name],b=shot.name==='bullet_catapult_skill_c'?{...template.bullet!,flight_time:Math.round(template.bullet!.flight_time*30)/30}:template.bullet!,motion=new CatapultMotion(shot.from,shot.to,b,(this.random()-.5)*Math.PI)
-      this.projectiles.push({id:this.nextId++,name:shot.name,born:time,duration:b.flight_time,from:shot.from,to:shot.to,pos:{...shot.from},done:false,rotation:0,bombMotion:motion,damageFactor:shot.factor,level:shot.level,source:shot.source,damageMin:shot.damageMin,damageMax:shot.damageMax})
+      this.projectiles.push({nativeVisual:shot.nativeVisual,id:this.nextId++,name:shot.name,born:time,duration:b.flight_time,from:shot.from,to:shot.to,pos:{...shot.from},done:false,rotation:0,bombMotion:motion,damageFactor:shot.factor,level:shot.level,sourceId:shot.sourceId,source:shot.source,damageMin:shot.damageMin,damageMax:shot.damageMax})
       this.onInsertProjectile(shot,this.projectiles.at(-1)!)
       if(b.particles_name==='ps_firebook_wizard')this.firebookTrails.queue(this.projectiles.at(-1)!,time)
       else if(b.particles_name==='ps_skill_c_wizard_1')this.firebookTrails.queue(this.projectiles.at(-1)!,time,'copies')
+      else if(b.particles_name==='ps_culverine_skill_a')this.firebookTrails.queue(this.projectiles.at(-1)!,time,'sulfur')
       else if(b.particles_name==='ps_catapult')this.firebookTrails.queue(this.projectiles.at(-1)!,time,'catapult')
       const sound=template.sound_events?.insert;if(sound&&!this.deferProjectileInsertSound)this.onSound(sound)
       return true

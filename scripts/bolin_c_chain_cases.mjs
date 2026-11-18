@@ -1,0 +1,3 @@
+const base=['skill_a','upg_a','upg_d','upg_b','skill_c']
+const make=(suffix,mode='normal',rank=1,extra=[],ticks=900)=>({scenario:'bolin-c'+suffix,mode,rank,nodes:[...base,...(rank>=2?['upg_sc1']:[]),...(rank>=3?['upg_sc2']:[]),...extra],ticks})
+export const bolinCCases=[make(''),make('-rank2','normal',2),make('-rank3','normal',3),...['left','up','down','up-left','down-left','moving','remove-before','remove-after','stun-before','stun-after','stun-boundary','no-target','boss','miniboss','small','armor','immune'].map(mode=>make('-'+mode,mode)),make('-talent1','normal',1,['talent_1']),make('-talent1-armor','armor',1,['talent_1']),make('-rank3-boss','boss',3),make('-rank3-small','small',3),make('-death','death',1,[],1100)]

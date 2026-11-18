@@ -22,7 +22,7 @@ A generic runtime bug was corrected: timed8 must not assume runs1 when the origi
 
 The harness selects the actual fifth tower in the cleared nine-star native slot so its real animation resources load, and copies the original terrain floor state as tower_upgrade normally does. Every trace asserts empty missing resources/animations. The retained original entities/queues are not projected out.
 
-The earlier7712 isolated basic tower frames and512 isolated ray traces remain supported. `browser_culverine_tower.mjs` passes the normal seven-star fifth-slot UI build and all three upgrades, verifies actual registered ray/decal painter keys/material alpha and real damage with original five-part EXOs. That browser uses a quiet controlled wave and frozen injected target; it is not ordinary-wave proof.
+The earlier7712 isolated basic tower frames and512 isolated ray/aura frames remain supported. `browser_culverine_tower.mjs` passes the normal seven-star fifth-slot UI build and all three upgrades, verifies actual registered ray/decal painter keys/material alpha and real damage with original five-part EXOs. That browser uses a quiet controlled wave and frozen injected target; it is not ordinary-wave proof.
 
 ## Ordinary campaign evidence
 
@@ -34,8 +34,8 @@ This battle exposed a real cross-controller boundary: a shadow-blade smoke cast 
 
 Original trace910666969bytes SHA256 `65b664691863ec9ccd4e3726d78f4c9c578ff1a3ac238411d5834c09f5709458`; full frame-stream SHA256 `db027d526559fae071978fdd197423e8238127c1b8c17da682ea49f77af7a6cc`.
 
-## Full paint gate in progress
+## Full paint gate
 
 The original renderer exported all9309 checkpoints,505863998bytes, SHA256 `d52f9c0dbedfb03b1898c1e12cdbc9cb9f9405f72981db8ba5004ee09ac257be`. The sample stream preserves every field, row and checkpoint; SHA256 `aa431c88f2add993ae16bdda34b949bd8192f7c6c914c7f83f5304f79af8c3e7`. The original exporter now writes each complete sample to an atomic partial file and renames only on completion. Its final tick/events/RNG/nextID/gold/lives metadata must equal the untouched ordinary trace.
 
-The browser verifier now reads large paint oracles as a lazy, fingerprint-checked stream and prepares only the current checkpoint. The original trace stream tests cover both frames and samples, preserved Unicode/f64 values/unknown fields/order, metadata and tamper detection. The former whole-file paint preprocessor caused excessive heap usage; this change keeps all9309 checkpoints rather than reducing coverage. Full Chrome atlas/EXO/alpha/order/GUI acceptance is still running and is not yet claimed as green here.
+The browser verifier now reads large paint oracles as a lazy, fingerprint-checked stream and prepares only the current checkpoint. The original trace stream tests cover both frames and samples, preserved Unicode/f64 values/unknown fields/order, metadata and tamper detection. The former whole-file paint preprocessor caused excessive heap usage; this change keeps all9309 checkpoints rather than reducing coverage. Full Chrome acceptance now passes all9309 checkpoints and1043571 actual submitted native frames, all18658 tick/resource/RNG/queue checks,22663 complete events,1599 named engine sound requests and the real defeat GUI. All four tower EXOs and registered ray/decal atlas frames/opacity/order are checked. The accepted original route sells both catapults before they fire, so it has zero ps_catapult inserts/visible frames; the gate explicitly asserts that absence instead of requiring a nonexistent emitter. Four-level UI imagery was visually inspected. Report: `browser-native-culverine-mixed-battle.json`; log: `culverine-mixed-browser.log`. This does not complete advanced Culverine, six fresh-save flows, pixel/video or heard-audio acceptance.

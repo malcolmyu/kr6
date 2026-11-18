@@ -1,0 +1,3 @@
+local f=assert(io.open('scripts/export_culverine_b_mixed.lua'));local source=f:read('*a');f:close()
+local count;source,count=source:gsub('culverineAllAttacks=entity.template_name:', 'spriteZ=entity.render and entity.render.sprites[1]and entity.render.sprites[1].z,spriteSortY=entity.render and entity.render.sprites[1]and entity.render.sprites[1].sort_y_offset,modifierLevel=entity.modifier and entity.modifier.level,culverineTimedAttacks=entity.timed_attacks and table.deepclone(entity.timed_attacks.list),rawMagicArmor=entity.health and entity.health.raw_magic_armor,sulfurLost=entity._magic_armor_lost,sulfurDuration=entity.actual_duration,culverineAllAttacks=entity.template_name:',1);assert(count==1)
+assert(loadstring(source,'@scripts/export_culverine_b_mixed.lua'))()

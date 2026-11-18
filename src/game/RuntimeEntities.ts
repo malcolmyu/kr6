@@ -11,7 +11,7 @@ import type {LevelData,GameMode} from './types'
 
 const defaults=rawDefaults as unknown as Record<string,BootstrapTemplateDefaults>
 export interface RuntimeEntityEvent {tick:number;kind:string;id:number;template:string;holder?:string}
-type Binding={kind:'culverineNative'|'reinforcementSpecial'|'knightLegacyAura'|'knightLegacyStun'|'knightArmor'|'wizardEmpower'|'archerRange'|'archerPierceRay'|'archerPierceStun'|'archerMark'|'copyBounce'|'copyAura'|'firebookBurn'|'enemyTeleport'|'heroLife'|'enemyArrow'|'enemyArrowEffect'|'zefiraHammer'|'geraldModifier'|'zefiraShield'|'smoke'|'royal'|'rainControl'|'meteor'|'particle'|'reinforcementControl'|'archerShooter'|'ambient'|'fishing'|'tower'|'enemy'|'soldier'|'hero'|'heroProjectile'|'projectile'|'pop'|'scene';model:object}
+type Binding={kind:'bolinMines'|'bolinMortar'|'bolinNative'|'catapultTrap'|'catapultTrapStun'|'catapultBomb'|'catapultTar'|'culverineThrottle'|'culverineSulfur'|'culverineNative'|'reinforcementSpecial'|'knightLegacyAura'|'knightLegacyStun'|'knightArmor'|'wizardEmpower'|'archerRange'|'archerPierceRay'|'archerPierceStun'|'archerMark'|'copyBounce'|'copyAura'|'firebookBurn'|'enemyTeleport'|'heroLife'|'enemyArrow'|'enemyArrowEffect'|'zefiraHammer'|'geraldModifier'|'zefiraShield'|'smoke'|'royal'|'rainControl'|'meteor'|'particle'|'reinforcementControl'|'archerShooter'|'ambient'|'fishing'|'tower'|'enemy'|'soldier'|'hero'|'heroProjectile'|'projectile'|'pop'|'scene';model:object}
 /** Actual normal-session allocation/queue owner. Unported script families
  * still need their callbacks wired here; events expose those gaps rather
  * than reading a native trace to guess missing IDs. */
@@ -27,7 +27,7 @@ export class RuntimeEntities {
  private byModel=new WeakMap<object,BootstrapEntity>()
  private tweens=new WeakMap<object,(time:number)=>void>()
  private jobs:{tick:number;site:TowerSite;run:()=>void}[]=[]
- private timed=new WeakMap<BootstrapEntity,{ts:number;frames?:number;duration?:number;runs?:number;fps:number}>()
+ private timed=new WeakMap<BootstrapEntity,{disabled?:boolean;ts:number;frames?:number;duration?:number;runs?:number;fps:number}>()
  constructor(level:LevelData,stage:number,mode:GameMode,team:string[],campaignComplete:boolean,sites:TowerSite[],restarted=false,skipCutscenes=false){
   this.registry=new NativeEntityRegistry(1,{
    onQueue:(e,inserting)=>this.record(inserting?'queueInsert':'queueRemove',e),
@@ -112,7 +112,7 @@ export class RuntimeEntities {
  }
  timedPhase(){
   for(const entity of this.registry.entities.values()){
-   const t=this.timed.get(entity);if(!t)continue
+   const t=this.timed.get(entity);if(!t||t.disabled)continue
    if(t.runs!==undefined&&t.frames!==undefined&&nativeLogicAnimationFrame(t.frames,this.registry.time,t.ts,false,t.fps).runs===t.runs||t.duration!==undefined&&this.registry.time-t.ts>t.duration){this.registry.queueRemove(entity);this.timed.delete(entity)}
   }
  }

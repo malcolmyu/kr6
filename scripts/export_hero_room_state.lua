@@ -19,7 +19,7 @@ local function newButton(tt,picked)
 end
 local function snapshot(n,result)if n.id then result[n.id]={hidden=n.hidden or false,image=n.image_name,text=n.text,alpha=n.alpha}end;for _,c in ipairs(n.children or{})do snapshot(c,result)end end
 out.nodeStates={}
-local sources={'hero_gerald','hero_zefira'};if menu=='global'then sources=out.order end;if menu=='power'then sources={};for _,name in ipairs(out.order)do sources[#sources+1]='power_'..name end end
+local sources={'hero_gerald','hero_zefira','hero_bolin'};if menu=='global'then sources=out.order end;if menu=='power'then sources={};for _,name in ipairs(out.order)do sources[#sources+1]='power_'..name end end
 for _,hero in ipairs(sources)do out.nodeStates[hero]={}
  for id,config in pairs(data.data_upgrades[hero])do if type(config)=='table'and id~='origin'then
   local states={};out.nodeStates[hero][id]=states

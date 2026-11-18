@@ -6,6 +6,8 @@ export function applyNativeTemplatePatches<T extends object>(templates:Record<st
  const out={...templates},cloned=new Set<string>()
  const operate=(before:unknown,value:unknown,op:string):unknown=>{
   if(op==='set')return value===undefined?undefined:structuredClone(value)
+  if(op==='map_mul'||op==='map_sum'){if(!Array.isArray(before))throw new Error(`Expected native numeric table for ${op}`);return before.map(n=>op==='map_mul'?Number(n)*Number(value):Number(n)+Number(value))}
+  if(op==='mul_sub')return Number(before)*(1-Number(value))
   if(op==='mul')return Number(before)*Number(value)
   if(op==='sum')return before===undefined?structuredClone(value):Number(before)+Number(value)
   if(op==='sub')return before===undefined?structuredClone(value):Number(before)-Number(value)

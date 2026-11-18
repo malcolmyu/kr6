@@ -1,0 +1,52 @@
+import {assertSulfurFrame} from './assert_culverine_sulfur_frame.mjs'
+import {assertCulverineFrame} from './assert_culverine_frame.mjs'
+import {readFileSync} from 'node:fs'
+import assert from 'node:assert/strict'
+import {GameSession} from '../src/game/GameSession.ts'
+import {applyStageSetup} from '../src/game/StageSetup.ts'
+const rank=Number(process.argv[2]??1),level=4,kind=process.argv[3]??'normal',suffix=kind==='normal'?'':`-${kind}`,read=p=>JSON.parse(readFileSync(p),(_,v)=>typeof v==='string'&&v.startsWith('@f64:')?Number(v.slice(5)):v),native=read(`analysis/level-entity-bootstrap-3-campaign-cleared-culverine-c-chain-${rank}${suffix}-runtime-lcg104.json`),p=native.profileOverrides
+let seed=104,calls=0;const g=new GameSession(read('public/data/level03.json'),read('public/data/level03-campaign.json'),read('public/data/entities.json'),()=>{calls++;seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296},'campaign',['archers','knights','catapult','wizard','culverine'],p.powerUpgrades??{},p.globalUpgrades)
+g.heroes.savedXp=p.heroXp;g.heroes.savedUpgrades=p.heroUpgrades;g.heroes.playerLevel=native.playerLevel;g.powers.equip(['reinforcements','rain_of_fire','royal_edict']);g.powers.progression.configure(p.powerXp,native.playerLevel,1);applyStageSetup(g,3,'campaign',true,true)
+const buffs=g.throttle,sounds=[];g.onSound=(name,options)=>{if(name.startsWith('TowerCulverin'))sounds.push({tick:g.tick,name,...(options?.delay===undefined?{}:{delay:options.delay})})}
+assert.deepEqual(native.resources.missing,[]);assert.deepEqual(native.resources.missingAnimations,[])
+let sulfurStates=0;let site,target,rayStates=0,auraStates=0,decalStates=0
+for(const f of native.frames){
+ if(f.tick===20){
+  for(const h of g.heroes.team){h.scriptLocked=true;h.pos={x:1000,y:650}}
+  g.spawnCinematicEnemy('enemy_bandit',1,{x:550,y:400});target=g.enemies.at(-1);target.hp=target.template.health.hp_max=10000;target.frozen=true;target.skillLocked=true;target.motionSpeed={x:0,y:0};target.path.pi=1;target.path.spi=1;target.path.ni=100;Object.assign(target.path.position,{x:550,y:400})
+  site={id:'culverine-source',tower:`tower_culverine_lvl${level}`,pos:{x:450,y:400},terrain:1,holder:'tower_holder_terrain_1_1',spent:0,powerLevels:{skill_c:['purchase','mid-windup'].includes(kind)?0:rank},powerChanges:new Set(['purchase','mid-windup'].includes(kind)?[]:['skill_c'])};if(kind==='b-combo'){site.powerLevels.skill_b=1;site.powerChanges.add('skill_b')}g.towers.sites.push(site);g.entities.queue(site.tower,site,'tower',site.id)
+ }
+ if(kind==='purchase'&&(f.tick===80||f.tick===120&&rank>=2||f.tick===160&&rank>=3)||kind==='mid-windup'&&f.tick===22){site.powerLevels.skill_c++;site.powerChanges.add('skill_c')}
+ if(kind==='remove-target-before'&&f.tick===23||kind==='remove-target-after'&&f.tick===24)g.entities.remove(target)
+ if(kind==='remove-source'&&f.tick===23)g.entities.remove(site)
+ if(kind==='sulfur-purchase-windup'&&f.tick===130){site.powerLevels.skill_c=3;site.powerChanges.add('skill_c')}
+ if(kind==='sulfur-remove-source'&&f.tick===149)g.entities.remove(site)
+ if(kind==='sulfur-remove-target'&&f.tick===146)g.entities.remove(target)
+ if(kind==='sulfur-block-cast'&&(f.tick===130||f.tick===170))site.towerBlocked=f.tick===130
+ if(kind==='throttle-upgrade'&&f.tick===100){site.powerLevels.skill_c=3;site.powerChanges.add('skill_c')}
+ if(kind==='throttle-remove-source'&&f.tick===113||kind==='throttle-remove-early'&&f.tick===90)g.entities.remove(site)
+ if(kind==='throttle-remove-target'&&f.tick===112)g.entities.remove(target)
+ if(kind==='throttle-block-prep'&&(f.tick===90||f.tick===160)||kind==='throttle-block-shot'&&(f.tick===112||f.tick===160))site.towerBlocked=f.tick!==160
+ if(kind==='throttle-target-gap'&&f.tick===100)g.entities.remove(target)
+ if(kind==='throttle-target-gap'&&f.tick===200){g.spawnCinematicEnemy('enemy_bandit',1,{x:550,y:400});target=g.enemies.at(-1);target.hp=target.template.health.hp_max=10000;target.frozen=true;target.skillLocked=true;target.motionSpeed={x:0,y:0};target.path.pi=1;target.path.spi=1;target.path.ni=100;Object.assign(target.path.position,{x:550,y:400})}
+ if(kind==='moving'&&f.tick>=100&&f.tick<250)target.path.position.x+=.5
+ g.advance(1/30);const r=g.entities.registry,ctx=`culverine/${level}/${f.tick}`
+ if(process.argv.includes('--dump')&&f.tick>=20&&f.tick<65)console.log(JSON.stringify({tick:f.tick,web:g.combat.culverineTowers.states.get(site?.id),native:f.entities.find(e=>e.template===site?.tower)}))
+ assert.equal(calls,f.randomBoundary,ctx+'/RNG');for(const key of ['nextId','count','max'])assert.equal(r[key],f[key],ctx+'/'+key)
+ assert.equal(g.gold,f.gold,ctx+'/gold');assert.equal(g.lives,f.lives,ctx+'/lives');assert.equal(g.waves.wave,f.wave,ctx+'/wave')
+ assert.deepEqual([...r.entities.values()].map(e=>[e.id,e.template]),f.entities.map(e=>[e.id,e.template]),ctx+'/table');assert.deepEqual(r.pendingInserts.map(e=>e.id),f.inserts,ctx+'/inserts');assert.deepEqual(r.pendingRemovals.map(e=>e.id),f.removals,ctx+'/removals')
+ for(const m of buffs.models){const a=f.entities.find(e=>e.id===g.entities.entity(m)?.id);assert(a,ctx+'/buff');assert.deepEqual(m.pos,a.pos,ctx+'/buff position');assert.equal(m.spriteAt,a.spriteTs,ctx+'/buff sprite clock');assert.equal(m.alpha,a.spriteAlpha,ctx+'/buff alpha');assert.equal(m.tweenAt,a.nativeTween.ts,ctx+'/buff tween clock');assert.equal(m.disabled,!!a.nativeTween.disabled,ctx+'/buff tween disabled')}
+ assert.equal(buffs.models.size,f.entities.filter(e=>e.template.startsWith('fx_culverine_skill_c_buff')).length,ctx+'/buff collection')
+ assertCulverineFrame(g,f,ctx)
+ if(site){const s=g.combat.culverineTowers.states.get(site.id),a=f.entities.find(e=>e.id===g.entities.entity(site)?.id);if(s&&a)for(const [i,t]of s.timedAttacks.entries())for(const key of ['ts','bullet','cooldown','disabled'])assert.equal(t[key],a.culverineTimedAttacks[i][key],ctx+'/timed '+i+'/'+key)}
+ if(target){const n=f.entities.find(e=>e.id===g.entities.entity(target)?.id);if(n){assert.equal(target.hp,n.hp,ctx+'/HP');assert.equal(target.template.health.magic_armor,n.magicArmor,ctx+'/magic armor');assert.equal(target.template.health.raw_magic_armor,n.rawMagicArmor,ctx+'/raw magic armor')}else assert(!r.entities.get(g.entities.entity(target)?.id),ctx+'/target absent')}
+ if(site){const state=g.combat.culverineTowers.states.get(site.id),n=f.entities.find(e=>e.id===g.entities.entity(site)?.id);if(state&&n){assert.equal(state.attackAt,n.culverineAttackTs,ctx+'/attack clock');for(const [i,p]of state.parts.entries()){const q=n.culverineParts[i];assert.equal(p.name,q.name,ctx+'/part name '+i);assert.equal(p.ts,q.ts,ctx+'/part clock '+i);assert.equal(p.flip,q.flip_x,ctx+'/part flip '+i);assert.equal(p.hidden,!!q.hidden,ctx+'/part hidden '+i);assert.equal(p.loop,q.loop,ctx+'/part loop '+i)}}}
+ for(const m of g.combat.nativeCulverine.rays){const n=f.entities.find(e=>e.id===g.entities.entity(m)?.id);assert(n,ctx+'/ray');assert.equal(m.born,n.spriteTs,ctx+'/ray clock');assert.equal(m.hidden,n.bullet.hidden,ctx+'/hidden');assert(Math.abs(m.rotation-n.rotation)<1e-12,ctx+'/rotation');for(const axis of ['x','y'])assert(Math.abs(m.scale[axis]-n.spriteScale[axis])<1e-12,ctx+'/scale');rayStates++}
+ for(const m of g.combat.nativeCulverine.decals){const n=f.entities.find(e=>e.id===g.entities.entity(m)?.id);assert(n,ctx+'/decal');assert.equal(m.born,n.spriteTs,ctx+'/decal clock');assert.equal(m.alpha,n.spriteAlpha,ctx+'/decal alpha');assert.deepEqual(m.pos,n.pos,ctx+'/decal pos');decalStates++}
+ for(const m of g.combat.nativeCulverine.auras){const n=f.entities.find(e=>e.id===g.entities.entity(m)?.id);assert(n,ctx+'/aura');assert.equal(m.sourceId,n.auraSource,ctx+'/source');assert.equal(m.factor,n.auraFactor,ctx+'/factor');assert.equal(m.level,n.auraLevel,ctx+'/level');assert.deepEqual(m.pos,n.pos,ctx+'/payload position');auraStates++}
+}
+assert.deepEqual(sounds,native.cSoundRequests,'Original C sound requests including per-call .7s delay');
+const event=({tick,kind,id,template})=>({tick,kind,id,template});assert.deepEqual(g.entities.events.map(event),native.events.map(event))
+if(kind==='zero-armor')assert(!g.entities.events.some(e=>e.template.startsWith('bullet_culverine_skill_c')));
+assert(g.entities.events.some(e=>e.template==='fx_culverine_skill_c_buff_fg'&&e.kind==='insert'));assert(g.entities.events.some(e=>e.template==='fx_culverine_skill_c_buff_bg'&&e.kind==='insert'));
+console.log({rank,kind,frames:native.frames.length,events:native.events.length,calls,rayStates,auraStates,decalStates,sulfurStates})

@@ -17,7 +17,7 @@ local function image(name)
 end
 for _,name in ipairs({'waveFlag_selected','waveFlag_0001','waveFlag_0002','waveFlag_0003','waveFlag_0004'})do image(name)end
 for _,name in ipairs({'ingame_ui_gui_bottom_bar_DESKTOP','ingame_ui_gui_portraits_hero_bg','ingame_ui_gui_portraits_hero_bg_hover','ingame_ui_hero_portrait_bars_0001','ingame_ui_hero_portrait_bars_0002','ingame_ui_power_loading','ingame_ui_power_button_frame_inactive','ingame_ui_power_button_frame_select','ingame_ui_power_button_frame_active_hover','ingame_ui_power_button_input_frame','in_game_icon_power_reinforcements','in_game_icon_power_rain_of_fire','in_game_icon_power_royal_edict'})do image(name)end
-for _,i in ipairs({1,3})do
+for _,i in ipairs({1,3,4})do
   for _,prefix in ipairs({'hero_portraits','hero_portraits_selected','hero_portraits_disabled'})do image(string.format('%s_%04d',prefix,i))end
 end
 for i=1,13 do image(string.format('ingame_ui_power_button_doors_%04d',i))end

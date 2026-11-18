@@ -14,7 +14,7 @@ local range=arg[4]=='archers-range-mixed'
 local empower=arg[4]=='wizard-empower-mixed'
 local knightArmor=arg[4]=='knight-armor-mixed'
 local knightHeal=arg[4]=='knight-heal-mixed'
-local culverine=arg[4]=='culverine-mixed'
+local culverine=arg[4]=='culverine-mixed'or arg[4]=='culverine-b-mixed'or arg[4]=='culverine-a-mixed'or arg[4]=='culverine-c-mixed'
 local special=arg[4]=='knight-legacy-special-mixed'
 local knightLegacy=special or arg[4]=='knight-legacy-mixed'
 local extended=culverine or knightLegacy or knightHeal or knightArmor or empower or mark or pierce or range or arg[4]=='firebook-mixed'or arg[4]=='wizard-copies-mixed'
@@ -33,7 +33,9 @@ local function snapshotRuntime()
  if knightHeal then for _,e in pairs(store.entities)do if e.template_name=='soldier_knights_lvl4'and e.render.sprites[1].name=='heal'then paintTicks[store.tick]=true end end end
  if knightLegacy then for _,e in pairs(store.entities)do if e.template_name=='soldier_knights_lvl4'and e.render.sprites[1].name=='attack_2'or e.template_name:match('^mod_knights_skill_c_stun')then paintTicks[store.tick]=true end end end
  if special then for _,e in pairs(store.entities)do if e.template_name=='decal_power_reinforcements_special'or e.template_name=='mod_reinforcement_special_armor'and e.render.sprites[1].alpha>0 and e.render.sprites[1].alpha<255 or e.template_name=='soldier_reinforcement_special'and store.tick%15==0 then paintTicks[store.tick]=true end end end
- if culverine then for _,e in pairs(store.entities)do if e.template_name:match('^bullet_culverine_lvl')or e.template_name=='fx_bullet_culverine_hit'and(e.render.sprites[1].alpha>0 and e.render.sprites[1].alpha<255 or store.tick%5==0)then paintTicks[store.tick]=true end end end
+ if culverine then for _,e in pairs(store.entities)do if e.template_name:match('^bullet_culverine_')or(e.template_name=='fx_bullet_culverine_hit'or e.template_name=='fx_bullet_culverine_skill_b_hit')and(e.render.sprites[1].alpha>0 and e.render.sprites[1].alpha<255 or store.tick%5==0)then paintTicks[store.tick]=true end end end
+ if arg[4]=='culverine-a-mixed'then for _,e in pairs(store.entities)do if e.template_name=='ps_culverine_skill_a'or e.template_name=='fx_bullet_culverine_skill_a_hit'or e.template_name:match('^decal_bullet_culverine_skill_a')and(e.render.sprites[1].alpha>0 and e.render.sprites[1].alpha<255 or store.tick%5==0)or e.template_name:match('^tower_culverine')and(e.render.sprites[3].name=='sulfurblast'or e.render.sprites[3].name=='reloadsulfurblast')then paintTicks[store.tick]=true end end end
+ if arg[4]=='culverine-c-mixed'then for _,e in pairs(store.entities)do if e.template_name:match('^fx_culverine_skill_c_buff')then paintTicks[store.tick]=true end end end
  if not paintTicks[store.tick]then return end
  local refs={}
  for id,e in pairs(store.entities)do

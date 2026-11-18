@@ -9,7 +9,7 @@ writeFileSync(`analysis/native-runtime-${variant}-profile.json`,JSON.stringify(p
 const opening=read('analysis/native-runtime-video-continued-input.json').filter(c=>c.kind==='build'&&c.tick<=841||['hero-rally','rally','send_wave','power'].includes(c.kind)).map(c=>c.kind==='build'&&c.holder===holder?{...c,tower:'culverine'}:{...c})
 const rain=opening.find(c=>c.tick===4362&&c.kind==='power'&&c.power==='rain_of_fire');if(rain){rain.tick=5502;rain.pos={x:-100,y:320}}
 const guard=opening.find(c=>c.tick===5352&&c.kind==='power'&&c.power==='reinforcements');if(guard)guard.pos={x:-100,y:320}
-let seed=104,draws=0,rayStates=0,auraStates=0,decalStates=0
+let seed=104,draws=0,rayStates=0,auraStates=0,decalStates=0,bPurchases=0,lastBPurchase=-Infinity
 const g=new GameSession(read('public/data/level03.json'),read('public/data/level03-campaign.json'),templates,()=>{draws++;seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296},'campaign',profile.towers,profile.powerUpgrades??{},profile.globalUpgrades)
 g.heroes.savedXp=profile.heroXp;g.heroes.savedUpgrades=profile.heroUpgrades;g.heroes.playerLevel=3;g.powers.equip(['reinforcements','rain_of_fire','royal_edict']);g.powers.progression.configure(profile.powerXp,3,1);applyStageSetup(g,3,'campaign',true,true)
 const site=g.towers.sites.find(s=>s.id===holder)
@@ -30,8 +30,9 @@ for(let tick=1;tick<=30000&&!g.outcome;tick++){
   }
   if(next&&g.gold>=next.price){g.upgradeTower(holder);commands.push({tick,kind:'upgrade',holder,tower:next.name})}
  }
+ if((process.argv.includes('--a')||process.argv.includes('--b')||process.argv.includes('--c'))&&tick%15===0&&site.tower==='tower_culverine_lvl4'&&!site.building&&tick-lastBPurchase>=1200){const skill=process.argv.includes('--a')?'skill_a':process.argv.includes('--c')?'skill_c':'skill_b',next=g.towers.nextPower(site,skill);if(next&&g.gold>=next.price){g.upgradeTowerPower(holder,skill);commands.push({tick,kind:'tower-power',holder,power:skill});bPurchases++;lastBPurchase=tick}}
  if(tick>841&&tick%30===0&&g.incomingWave&&!g.enemies.some(e=>e.hp>0&&e.escapedAt===undefined)){g.callNextWave();commands.push({tick,kind:'send_wave'})}
  g.advance(1/30);rayStates+=g.combat.nativeCulverine.rays.length;auraStates+=g.combat.nativeCulverine.auras.size;decalStates+=g.combat.nativeCulverine.decals.size
 }
 writeFileSync(`analysis/native-runtime-${variant}-input.json`,JSON.stringify(commands,null,2)+'\n')
-console.log(JSON.stringify({tick:g.tick,gold:g.gold,outcome:g.outcome,draws,rayStates,auraStates,decalStates,tower:site.tower,commands},null,2))
+console.log(JSON.stringify({tick:g.tick,gold:g.gold,outcome:g.outcome,draws,bPurchases,rayStates,auraStates,decalStates,throttleCasts:g.entities.events.filter(e=>e.kind==='queueInsert'&&e.template==='fx_culverine_skill_c_buff_fg').length,sulfurShots:g.entities.events.filter(e=>e.kind==='queueInsert'&&e.template.startsWith('bullet_culverine_skill_a')).length,tower:site.tower,commands},null,2))

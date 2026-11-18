@@ -20,15 +20,15 @@ try{
     this.trapFixture=true;this.towers.sites.forEach(s=>s.attackDisabled=true);this.heroes.team.forEach(h=>h.scriptLocked=true)
     const site=this.towers.sites.find(s=>s.id==='8');site.attackDisabled=false;const far={x:-100,y:-100};this.spawnCinematicEnemy('enemy_bandit',1,far);const enemy=this.enemies.at(-1);enemy.hp=5000;enemy.template.health.hp_max=5000;enemy.template.motion.max_speed=60;enemy.skillLocked=true
     const place=pos=>{enemy.path=new PathFollower([pos,{x:pos.x+500,y:pos.y}]);enemy.hp=5000;enemy.skillLocked=true};place(far)
-    const damage=[],shots=[],onDamage=this.combat.catapultTraps.onDamage,shoot=this.combat.catapultTowers.onShoot
-    this.combat.catapultTraps.onDamage=(e,value,time)=>{damage.push({id:e.id,value,time});onDamage(e,value,time)};this.combat.catapultTowers.onShoot=(...args)=>{shots.push({name:args[1],level:args[6],at:args[5]});shoot(...args)}
+    const damage=[],shots=[],onDamage=this.combat.nativeTraps.onDamage,shoot=this.combat.catapultTowers.onShoot
+    this.combat.nativeTraps.onDamage=(e,value,type)=>{damage.push({id:e.id,value,time:this.time});onDamage(e,value,type)};this.combat.catapultTowers.onShoot=(...args)=>{shots.push({name:args[1],level:args[6],at:args[5]});shoot(...args)}
     window.trapFixture={game:this,site,enemy,damage,shots,place,far,movement:[],measure:false}
    }
    const f=this.trapFixture&&window.trapFixture,x=f?.enemy.path.position.x,at=this.time,stunned=f?.enemy.template.unit.is_stunned
    advance.call(this,dt)
    if(f){
     if(f.measure&&this.time>at){f.movement.push({dt:this.time-at,dx:f.enemy.path.position.x-x,stunned:!!stunned});if(f.movement.length>=12){f.measure=false;f.enemy.skillLocked=true}}
-    const {site,enemy,damage,shots}=f,stun=this.combat.catapultTraps.stuns.get(enemy.id);window.trapObservation={time:this.time,wave:this.waves.wave,power:site.powerLevels?.skill_c??0,traps:this.combat.catapultTraps.traps.map(t=>({...t})),stun:stun&&{level:stun.level,duration:stun.duration,at:stun.at,pending:stun.pending},damage:[...damage],shots:[...shots],hp:enemy.hp,stunned:!!enemy.template.unit.is_stunned}
+    const {site,enemy,damage,shots}=f,stun=this.combat.nativeTraps.stuns.stuns.find(s=>s.enemy===enemy);window.trapObservation={time:this.time,wave:this.waves.wave,power:site.powerLevels?.skill_c??0,traps:[...this.combat.nativeTraps.traps].map(t=>({...t})),stun:stun&&{level:stun.level,duration:stun.duration,at:stun.ts,pending:stun.queued},damage:[...damage],shots:[...shots],hp:enemy.hp,stunned:!!enemy.template.unit.is_stunned}
    }
   }
  })
@@ -45,7 +45,7 @@ try{
   }else await page.getByRole('button',{name:'取消',exact:true}).click()
   await page.evaluate(()=>{window.trapFixture.place(window.trapFixture.far);window.trapFixture.site.attackDisabled=false})
   await page.waitForFunction(rank=>window.trapObservation.traps.some(t=>t.level===rank&&t.name==='ready'),rank)
-  await page.evaluate(rank=>{const f=window.trapFixture,t=f.game.combat.catapultTraps.traps.find(t=>t.level===rank&&t.name==='ready');f.site.attackDisabled=true;f.place(t.pos)},rank)
+  await page.evaluate(rank=>{const f=window.trapFixture,t=[...f.game.combat.nativeTraps.traps].find(t=>t.level===rank&&t.name==='ready');f.site.attackDisabled=true;f.place(t.pos)},rank)
   await page.waitForFunction(rank=>window.trapObservation.stun?.level===rank,rank)
   const obs=await page.evaluate(()=>window.trapObservation),hit=obs.damage.at(-1);assert(hit.value>=[20,32,48][rank-1]&&hit.value<=[30,48,72][rank-1]);assert.equal(obs.hp,5000-hit.value);assert.equal(obs.stun.duration,rank);assert(obs.stunned)
   if(rank===3){await page.screenshot({path:'analysis/web-catapult-traps-rank3.png'});await page.evaluate(()=>{const f=window.trapFixture;f.measure=true;f.enemy.skillLocked=false});await page.waitForFunction(()=>window.trapFixture.movement.length>=12);const moves=await page.evaluate(()=>window.trapFixture.movement);assert(moves.every(m=>m.stunned&&m.dx===0),'actual stunned enemy path stops')}
@@ -56,7 +56,7 @@ try{
  await page.mouse.click(point.x,point.y);await page.getByRole('button',{name:'防卫区域 · 已满级',exact:true}).click();assert.match(await page.locator('.tower-tooltip').innerText(),/48-72.*眩晕 3 秒/s);await page.screenshot({path:'analysis/web-catapult-traps-menu.png'});await page.getByRole('button',{name:'取消',exact:true}).click()
  await page.evaluate(()=>{const f=window.trapFixture;f.place(f.far);f.site.attackDisabled=false})
  await page.waitForFunction(()=>window.trapObservation.traps.some(t=>t.level===3&&t.name==='ready'))
- const orphan=await page.evaluate(()=>{const f=window.trapFixture;f.site.attackDisabled=true;return {...f.game.combat.catapultTraps.traps.find(t=>t.name==='ready').pos}})
+ const orphan=await page.evaluate(()=>{const f=window.trapFixture;f.site.attackDisabled=true;return {...[...f.game.combat.nativeTraps.traps].find(t=>t.name==='ready').pos}})
  await page.mouse.click(point.x,point.y);const sell=page.getByRole('button',{name:/^出售 ·/});await sell.click();await sell.click();await page.waitForFunction(()=>window.trapFixture.site.tower===undefined)
  assert(await page.evaluate(()=>window.trapObservation.traps.length>0),'untriggered native traps survive source sale');const count=await page.evaluate(()=>window.trapObservation.damage.length);await page.evaluate(pos=>window.trapFixture.place(pos),orphan);await page.waitForFunction(count=>window.trapObservation.damage.length>count&&window.trapObservation.stunned,count);await page.waitForFunction(()=>window.trapObservation.traps.length===0&&!window.trapObservation.stunned)
  const frames=await page.evaluate(()=>window.trapFrames),sounds=await page.evaluate(()=>window.trapSounds),animations=await page.evaluate(()=>window.trapAnimations)

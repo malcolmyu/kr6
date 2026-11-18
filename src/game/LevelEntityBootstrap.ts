@@ -3,7 +3,7 @@ import type {PersistentEntity} from './NativePersistentEntities'
 
 export interface BootstrapEntity extends PersistentEntity {id:number;template:string;pending_removal?:boolean;mapIndex?:number;holderId?:string;controllerT?:string}
 interface MapEntity {template:string;'editor.game_mode'?:number;'tower.holder_id'?:string;editor?:{game_mode?:number}}
-export interface BootstrapTemplateDefaults {timed?:{frames?:number;duration?:number;runs?:number;fps:number};hasEditor:boolean;gameMode?:number;controllerT?:string;indexComponents?:Omit<PersistentEntity,'id'>}
+export interface BootstrapTemplateDefaults {timed?:{disabled?:boolean;frames?:number;duration?:number;runs?:number;fps:number};hasEditor:boolean;gameMode?:number;controllerT?:string;indexComponents?:Omit<PersistentEntity,'id'>}
 interface BootstrapOptions {stage:number;mode:number;team:string[];campaignComplete:boolean;restarted?:boolean;skipCutscenes?:boolean;debug?:boolean}
 
 export function createLevelEntity(registry:NativeEntityRegistry<BootstrapEntity>,defaults:Record<string,BootstrapTemplateDefaults>,template:string,fields:Partial<BootstrapEntity>={}){

@@ -10,7 +10,7 @@ try {
  await page.goto('http://127.0.0.1:5173/?debug=1')
  await page.getByRole('button',{name:'开始游戏',exact:true}).click();await page.getByRole('button',{name:'点击开始',exact:true}).click();await selectDefaultSlot(page);await waitForGame(page)
  assert.equal(await page.locator('[data-hero="杰拉尔德"] .hero-level').textContent(),'1')
- assert.equal(await page.locator('[data-hero="泽菲拉"] .hero-level').textContent(),'3')
+ assert.equal(await page.locator('[data-hero="泽菲菈"] .hero-level').textContent(),'3')
  await page.evaluate(async()=>{
   const url=performance.getEntriesByType('resource').find(r=>r.name.includes('/src/game/GameSession.ts')).name,{GameSession}=await import(url),original=GameSession.prototype.advance
   GameSession.prototype.advance=function(dt){
@@ -26,7 +26,7 @@ try {
  assert.deepEqual(await page.evaluate(()=>window.heroXpObservation),{xp:1005,level:2,hp:240,animation:undefined,locked:false})
  await page.getByRole('button',{name:'2. 奥术魔法学院',exact:true}).click();await waitForGame(page)
  assert.equal(await page.locator('[data-hero="杰拉尔德"] .hero-level').textContent(),'2')
- assert.equal(await page.locator('[data-hero="泽菲拉"] .hero-level').textContent(),'3')
+ assert.equal(await page.locator('[data-hero="泽菲菈"] .hero-level').textContent(),'3')
  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('kingdom-rush-6.progress.v1')))
  assert.equal(saved.heroes.hero_gerald,1005);assert.equal(saved.heroes.hero_zefira,4000)
  await page.screenshot({path:'analysis/web-hero-xp-next-stage.png'})

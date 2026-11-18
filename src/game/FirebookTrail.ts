@@ -1,3 +1,6 @@
+import bolinCasing from '../../public/data/bolin-casing-trail.json' with {type:'json'}
+import bolinMortar from '../../public/data/bolin-mortar.json' with {type:'json'}
+import sulfur from '../../public/data/culverine-sulfur-trail.json' with {type:'json'}
 import {nativeSpriteOrder} from './NativePainterOrder.ts'
 import copies from '../../public/data/wizard-copies-trail.json' with {type:'json'}
 import rain from '../../public/data/rain-trail.json' with {type:'json'}
@@ -9,9 +12,9 @@ import {nativeAnimationFrame} from './NativeAnimation.ts'
 import type {Point} from './types'
 interface Source {id:number;pos:Point;rotation:number}
 export interface FirebookParticle {id:number;at:number;lifetime:number;pos:Point;rotation:number;frame:string;alpha:number;scale:Point;drawOrder:number;scaleFactor?:number}
-type TrailKind='copies'|'firebook'|'wizard'|'catapult'|'zefira'|'rain'
+type TrailKind='bolinMortar'|'bolinCasing'|'sulfur'|'copies'|'firebook'|'wizard'|'catapult'|'zefira'|'rain'
 interface TrailConfig {system:{z?:number;draw_order?:number;sort_y?:number;sort_y_offset?:number;emission_rate:number;ts_offset:number;particle_lifetime:number[];alphas:number[];scales_x?:number[];scales_y?:number[];scale_var?:number[];scale_same_aspect?:boolean;track_rotation?:boolean;emit_direction?:number;emit_area_spread?:Point;emit_rotation_spread?:number;animated?:boolean;animation_fps?:number;loop:boolean;name:string};animation?:{from:number;to:number;prefix:string}}
-const configFor=(kind:TrailKind)=>(kind==='copies'?copies:kind==='rain'?rain:kind==='wizard'?wizard:kind==='catapult'?catapult:kind==='zefira'?zefira:native) as unknown as TrailConfig
+const configFor=(kind:TrailKind)=>(kind==='bolinMortar'?bolinMortar:kind==='bolinCasing'?bolinCasing:kind==='sulfur'?sulfur:kind==='copies'?copies:kind==='rain'?rain:kind==='wizard'?wizard:kind==='catapult'?catapult:kind==='zefira'?zefira:native) as unknown as TrailConfig
 /** Particle frame draw_order is independent of sprite indices (systems2473). */
 export function nativeTrailParticleOrder(trail:FirebookTrail,particle:FirebookParticle,entity:number){
  const config=configFor(trail.kind).system,order=nativeSpriteOrder(config,particle.pos,entity)

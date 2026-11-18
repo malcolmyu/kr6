@@ -1,3 +1,9 @@
+import {BolinController} from './BolinController.ts'
+import {BolinNativeRuntime} from './BolinNativeRuntime.ts'
+import {BolinMortarRuntime} from './BolinMortarRuntime.ts'
+import {BolinMinesRuntime} from './BolinMinesRuntime.ts'
+import {heroStartingXp} from './HeroTeam.ts'
+import {bolinUpgradeTemplates} from './BolinUpgrades.ts'
 import {HeroLifeRuntime} from './HeroLifeRuntime.ts'
 import {ZefiraTalents} from './ZefiraTalents.ts'
 import {ZefiraUltimate} from './ZefiraUltimate.ts'
@@ -27,6 +33,10 @@ interface ZefiraIntro {at:number;phase:number;phaseAt:number;finished:boolean}
 interface Teleport {hero:HeroUnit;to:Point;at:number;phase:'out'|'in'}
 /** Original default team, first-stage entry and second-stage Zefira introduction. */
 export class HeroSystem {
+  readonly bolin=new BolinController()
+  readonly bolinRuntime:BolinNativeRuntime
+  readonly bolinMortar:BolinMortarRuntime
+  readonly bolinMines:BolinMinesRuntime
   readonly life=new HeroLifeRuntime()
   nativeLifeEnabled=false
   readonly team:HeroUnit[]=[]
@@ -55,6 +65,8 @@ export class HeroSystem {
   playerLevel=0
   stage=1
   mode=1
+  selectedTeam?:string[]
+  bolinTemplates?:Record<string,HeroTemplate>
   savedXp:Record<string,number>={}
   savedUpgrades:Record<string,string[]>={}
   private templates:Record<string,HeroTemplate>
@@ -71,6 +83,13 @@ export class HeroSystem {
     this.zefiraMovement.onSound=name=>this.onSound(name)
     this.survivor.onSound=name=>this.onSound(name)
     this.templates=templates;this.barracks=barracks
+    this.bolinRuntime=new BolinNativeRuntime(()=>this.bolinTemplates??this.templates,random)
+    this.bolinMortar=new BolinMortarRuntime(()=>this.bolinTemplates??this.templates,random)
+    this.bolinMines=new BolinMinesRuntime(()=>this.bolinTemplates??this.templates,random)
+    this.bolin.mines.random=random;this.bolin.mines.onThrow=(h,a,p)=>this.bolinMines.throw(h,a,p)
+    this.bolin.mortar.onFire=(h,a,points,flight)=>this.bolinMortar.fire(h,a,points,flight)
+    this.bolin.onCasing=(h,a)=>this.bolinRuntime.casing(h,a)
+    this.bolin.onShoot=(h,a,target,from,to)=>this.bolinRuntime.shoot(h,a,target,from,to)
     this.geraldSkills=new GeraldSkills(templates as unknown as ConstructorParameters<typeof GeraldSkills>[0])
     this.geraldSkills.onSound=name=>this.onSound(name)
     this.ranged=new HeroRangedCombat(templates as unknown as ConstructorParameters<typeof HeroRangedCombat>[0],random,onKill,barracks.dodges)
@@ -82,7 +101,7 @@ export class HeroSystem {
   insertTeam(level:LevelData,time:number,includeZefira=true) {
     const positions=level.data.custom_spawn_pos??level.data.entities_list.filter(e=>e.template==='decal_defend_point5'&&e.pos).map(e=>({pos:e.pos!}))
     if(!positions.length)throw new Error('Missing original hero spawn positions')
-    for(const [index,name] of (includeZefira?['hero_gerald','hero_zefira']:['hero_gerald']).entries())this.insert(name,positions[index%positions.length].pos,time)
+    for(const [index,name] of (includeZefira?(this.selectedTeam??['hero_gerald','hero_zefira']):[this.selectedTeam?.[0]??'hero_gerald']).entries())this.insert(name,positions[index%positions.length].pos,time)
   }
   private cinematic(active:boolean){this.curtains=active;this.guiHidden=active;this.onCinematic(active)}
   startIntro(pos:Point,time:number) {
@@ -134,9 +153,10 @@ export class HeroSystem {
   insertGerald(pos:Point,time:number){return this.insert('hero_gerald',pos,time)}
   insert(name:string,pos:Point,time:number):HeroUnit {
     const previous=this.team.find(h=>h.name===name);if(previous)return previous
-    const template=structuredClone(this.templates[name]),ls=template.hero.level_stats
-    const xp=this.savedXp[name]??0,level=heroLevel(xp),index=level-1
+    const xp=Math.max(this.savedXp[name]??0,heroStartingXp(name)),level=heroLevel(xp),index=level-1
     const nodes=validateHeroUpgrades(heroUpgradeData,name,xp,this.savedUpgrades[name]??[])
+    if(name==='hero_bolin')this.bolinTemplates=bolinUpgradeTemplates(this.templates,nodes)
+    const template=structuredClone((name==='hero_bolin'?this.bolinTemplates!:this.templates)[name]),ls=template.hero.level_stats
     const map=(key:keyof typeof ls,factor:number,addition=0)=>{const values=ls[key];if(values)ls[key]=values.map(n=>n*factor+addition)}
     if(name==='hero_gerald'){
       if(nodes.includes('talent_1')&&template.dodge)template.dodge.chance=.35
@@ -175,6 +195,7 @@ export class HeroSystem {
   private advanceGrowth(time:number,skip?:HeroUnit,only?:HeroUnit) {
     for(const hero of this.team) {
       if(only&&hero!==only)continue
+      if(hero.name==='hero_bolin'&&hero.template.unit?.is_stunned)continue
       if(hero===skip||hero===this.gerald&&this.nativeGeraldRally&&this.pendingGeraldRally)continue
       if(hero.levelUpEndsAt!==undefined) {
         if(time+1e-9>=hero.levelUpEndsAt){hero.levelUpEndsAt=undefined;hero.scriptLocked=false;hero.visualOverride=undefined}
@@ -187,7 +208,7 @@ export class HeroSystem {
       template.health.hp_max=ls.hp_max[index];template.health.armor=ls.armor[index];template.regen.health=ls.regen_health[index]
       for(const [attackIndex,attack]of template.melee.attacks.entries())if(attack.basic_attack||hero.name==='hero_gerald'&&attackIndex===1){attack.damage_min=ls.melee_damage_min[index];attack.damage_max=ls.melee_damage_max[index]}
       if(ls.ranged_damage_min && ls.ranged_damage_max)hero.rangedDamage=[ls.ranged_damage_min[index],ls.ranged_damage_max[index]]
-      hero.hp=template.health.hp_max;hero.scriptLocked=true;hero.visualOverride={name:'level_up',at:time};hero.levelUpEndsAt=time+template.webAnimationDurations.level_up
+      hero.hp=template.health.hp_max;hero.scriptLocked=true;hero.visualOverride={name:hero.name==='hero_bolin'?'levelup':'level_up',at:time};hero.levelUpEndsAt=time+template.webAnimationDurations[hero.visualOverride.name]
       if(template.sound_events?.level_up)this.onSound(template.sound_events.level_up)
       this.onSound('HeroLevelUp')
     }

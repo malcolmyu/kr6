@@ -13,4 +13,6 @@ source=source:sub(1,at-1)..[[
 ]]..source:sub(at)
 source=source:gsub("slot.towers.selected={'archers','knights','catapult','wizard'}","slot.towers.selected={'archers','knights','catapult','wizard','culverine'}",1)
 local n;source,n=source:gsub('hp=entity.health and entity.health.hp,','culverineParts=entity.template_name:match("^tower_culverine") and table.deepclone(entity.render.sprites),culverineAttackTs=entity.template_name:match("^tower_culverine") and entity.attacks.list[1].ts,auraSource=entity.aura and entity.aura.source_id,auraLevel=entity.aura and entity.aura.level,auraFactor=entity.aura and entity.aura.damage_factor,auraMin=entity.aura and entity.aura.damage_min,auraMax=entity.aura and entity.aura.damage_max,hp=entity.health and entity.health.hp,',1);assert(n==1)
+if CULVERINE_CHAIN_TRANSFORM then source=CULVERINE_CHAIN_TRANSFORM(source)end
+if CONTROLLED_PAINT_TRANSFORM then source=CONTROLLED_PAINT_TRANSFORM(source)end
 assert(loadstring(source,'@scripts/export_level_entity_bootstrap.lua'))()

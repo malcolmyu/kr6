@@ -20,7 +20,7 @@ export class WizardFirebookRenderer {
   }
   for(const [id,art]of this.sprites)if(!live.has(id)){art.dispose();this.sprites.delete(id)}
   const particles=new Set<number|string>()
-  for(const [family,trails]of [['tower',session.combat.firebookTrails.trails],['hero',session.heroes.ranged.trails.trails],['rain',session.powers.rainTrails.trails]] as const)for(const trail of trails)for(const p of trail.particles){
+  for(const [family,trails]of [['tower',session.combat.firebookTrails.trails],['hero',session.heroes.ranged.trails.trails],['rain',session.powers.rainTrails.trails],['bolin',session.heroes.bolinRuntime.trails.trails],['mortar',session.heroes.bolinMortar.trails.trails]] as const)for(const trail of trails)for(const p of trail.particles){
    const key=family==='tower'?p.id:`${family}:${p.id}`;particles.add(key);let art=this.trailSprites.get(key)
    if(!art){art=this.atlas.create();this.trailSprites.set(key,art);this.scene.add(art.root)}
    art.setFrame(p.frame,{x:.5,y:.5});art.root.position.set(p.pos.x,p.pos.y,2);art.root.rotation.z=p.rotation

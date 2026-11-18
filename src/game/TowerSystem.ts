@@ -1,7 +1,7 @@
 import type { LevelData, GameMode, Point } from './types'
 export type TowerKind = 'archers' | 'wizard' | 'knights' | 'catapult' | 'culverine'
 export interface TowerPower {level:number;max_level:number;price:number[];price_base?:number;price_inc?:number}
-export const implementedTowerPowers:Record<string,string[]>={archers:['skill_a','skill_b','skill_c'],wizard:['skill_a','skill_b','skill_c'],catapult:['skill_a','skill_b','skill_c'],knights:['skill_a','skill_b','skill_c']}
+export const implementedTowerPowers:Record<string,string[]>={archers:['skill_a','skill_b','skill_c'],wizard:['skill_a','skill_b','skill_c'],catapult:['skill_a','skill_b','skill_c'],knights:['skill_a','skill_b','skill_c'],culverine:['skill_a','skill_b','skill_c']}
 export interface TowerTemplate {
   powers?:Record<string,TowerPower>
   tower: { price:number; refund_factor:number; level:number; type:string;menu_offset?:Point;range_offset?:Point }

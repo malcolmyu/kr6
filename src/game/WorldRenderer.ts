@@ -1,3 +1,7 @@
+import {BolinMinesRenderer} from './BolinMinesRenderer.ts'
+import {BolinMortarRenderer} from './BolinMortarRenderer.ts'
+import {BolinRenderer} from './BolinRenderer.ts'
+import {CulverineThrottleRenderer} from './CulverineThrottleRenderer.ts'
 import {CulverineNativeRenderer} from './CulverineNativeRenderer'
 import {ReinforcementSpecialRenderer} from './ReinforcementSpecialRenderer'
 import {KnightArmorRenderer} from './KnightArmorRenderer'
@@ -45,6 +49,7 @@ export class WorldRenderer {
   sessionRandom:()=>number=Math.random
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
+  private culverineThrottleRenderer?:CulverineThrottleRenderer
   private culverineNativeRenderer?:CulverineNativeRenderer
   private reinforcementSpecialRenderer?:ReinforcementSpecialRenderer
   private knightArmorRenderer?:KnightArmorRenderer
@@ -52,6 +57,9 @@ export class WorldRenderer {
   private archerRangeRenderer?:ArcherRangeRenderer
   private royalRenderer?:RoyalEdictRenderer
   private rainRenderer?:RainRenderer
+  private bolinRenderer?:BolinRenderer
+  private bolinMortarRenderer?:BolinMortarRenderer
+  private bolinMinesRenderer?:BolinMinesRenderer
   private catapultBombRenderer?:CatapultBombRenderer
   private catapultTarRenderer?:CatapultTarRenderer
   private catapultTrapsRenderer?:CatapultTrapsRenderer
@@ -95,7 +103,7 @@ export class WorldRenderer {
   private projectileSprites=new Map<number,AtlasSprite|ExoSprite>()
   private previousTime = 0
   onChange: () => void = () => {}
-  onSound:(name:string)=>void=()=>{}
+  onSound:(name:string,options?:{delay?:number})=>void=()=>{}
   onStopSound:(name:string)=>void=()=>{}
   onSiteSelect: (site:TowerSite|undefined)=>void=()=>{}
   projectPoint(point:{x:number;y:number}):{x:number;y:number} {
@@ -158,7 +166,7 @@ export class WorldRenderer {
     session.powers.selected=undefined;session.tutorial?.closeMenu();this.onSiteSelect(undefined)
   }
   onLoadProgress:(value:number)=>void=()=>{}
-  async load(level: number, mode: GameMode = 'campaign',firstCampaignComplete=false,stageComplete=false,restarted=false,heroXp:Record<string,number>={},playerLevel=0,selectedPowers:PowerKind[]=['reinforcements','rain_of_fire'],heroUpgrades:Record<string,string[]>={},selectedTowers:import('./TowerSystem').TowerKind[]=['archers','knights','catapult'],onboarding:{stage1?:true;stage2?:true}={},powerXp:Partial<Record<PowerKind,number>>={},powerUpgrades:PowerUpgradeSelection={},globalUpgrades:GlobalUpgradeSelection={}): Promise<LevelData> {
+  async load(level: number, mode: GameMode = 'campaign',firstCampaignComplete=false,stageComplete=false,restarted=false,heroXp:Record<string,number>={},playerLevel=0,selectedPowers:PowerKind[]=['reinforcements','rain_of_fire'],heroUpgrades:Record<string,string[]>={},selectedTowers:import('./TowerSystem').TowerKind[]=['archers','knights','catapult'],onboarding:{stage1?:true;stage2?:true}={},powerXp:Partial<Record<PowerKind,number>>={},powerUpgrades:PowerUpgradeSelection={},globalUpgrades:GlobalUpgradeSelection={},selectedHeroes?:string[]): Promise<LevelData> {
     const generation = ++this.generation
     const prefix = `level${String(level).padStart(2, '0')}`
     const response = await fetch(`data/${prefix}.json`)
@@ -193,16 +201,21 @@ export class WorldRenderer {
     this.templates.stage_01_tower_build_indicator=tutorialArt.buildIndicator
     this.resources.push(this.towerAtlas,...Object.values(towerTextures))
     this.session = new GameSession(data,program,templates,this.sessionRandom,mode,selectedTowers,powerUpgrades,globalUpgrades)
+    this.session.heroes.selectedTeam=selectedHeroes
     const heroExo:ExoDefinition=towerArt.exos.hero_geraldDef
     this.session.heroes.respawnDuration=heroExo.animations.find(a=>a.name==='level_up')!.frames.length/heroExo.fps
     this.session.powers.equip(selectedPowers)
     this.royalRenderer=new RoyalEdictRenderer(this.scene,this.towerAtlas,towerArt.exos)
     this.rainRenderer=new RainRenderer(this.scene,this.towerAtlas)
+    this.bolinMinesRenderer=new BolinMinesRenderer(this.scene,this.towerAtlas,towerArt.exos,templates)
+    this.bolinMortarRenderer=new BolinMortarRenderer(this.scene,this.towerAtlas,towerArt.exos,towerArt.animations,templates)
+    this.bolinRenderer=new BolinRenderer(this.scene,this.towerAtlas,towerArt.exos,towerArt.animations,templates)
     this.catapultBombRenderer=new CatapultBombRenderer(this.scene,this.towerAtlas,towerArt.animations)
     this.catapultTarRenderer=new CatapultTarRenderer(this.scene,this.towerAtlas,towerArt.animations)
     this.catapultTrapsRenderer=new CatapultTrapsRenderer(this.scene,this.towerAtlas,towerArt.animations)
     this.heroLifeRenderer=new HeroLifeRenderer(this.scene,this.towerAtlas,towerArt.exos)
     this.zefiraSkillsRenderer=new ZefiraSkillsRenderer(this.scene,this.towerAtlas,towerArt.exos,towerArt.animations)
+    this.culverineThrottleRenderer=new CulverineThrottleRenderer(this.scene,this.towerAtlas,towerArt.exos,templates)
     this.culverineNativeRenderer=new CulverineNativeRenderer(this.scene,this.towerAtlas,towerArt.animations,templates)
     this.reinforcementSpecialRenderer=new ReinforcementSpecialRenderer(this.scene,this.towerAtlas,towerArt.animations,templates)
     this.knightArmorRenderer=new KnightArmorRenderer(this.scene,this.towerAtlas)
@@ -220,7 +233,7 @@ export class WorldRenderer {
     applyStageSetup(this.session,level,mode,firstCampaignComplete,stageComplete,restarted,onboarding)
     this.environment=new EnvironmentRenderer(this.scene,this.towerAtlas,towerArt.animations,towerArt.exos,templates,data,mode,Math.random,this.session.creatures)
     this.fishingRenderer=new FishingRenderer(this.scene,this.towerAtlas,towerArt.exos)
-    this.session.onSound=name=>this.onSound(name)
+    this.session.onSound=(name,options)=>this.onSound(name,options)
     this.session.onStopSound=name=>this.onStopSound(name)
     this.session.combat.onEffect=(name,pos,time,transform)=>{
       if(this.session!.staticEffects.models.some(m=>m.name===name&&m.at===time&&m.pos.x===pos.x&&m.pos.y===pos.y))return
@@ -297,10 +310,12 @@ export class WorldRenderer {
       this.healthBars.advance(session)
       this.renderPowers()
       this.rainRenderer?.advance(session)
+      this.bolinRenderer?.advance(session);this.bolinMortarRenderer?.advance(session);this.bolinMinesRenderer?.advance(session)
       this.catapultBombRenderer?.advance(session)
       this.catapultTarRenderer?.advance(session)
       this.catapultTrapsRenderer?.advance(session)
       this.archerRangeRenderer?.advance(session)
+      this.culverineThrottleRenderer?.advance(session,session.throttle)
       this.culverineNativeRenderer?.advance(session)
       this.reinforcementSpecialRenderer?.advance(session)
       this.knightArmorRenderer?.advance(session)
@@ -578,9 +593,9 @@ export class WorldRenderer {
       if(projectile.born===undefined)continue
       live.add(projectile.id)
       let art=this.projectileSprites.get(projectile.id)
-      const config=this.templates[projectile.name].render.sprites[0]
+      const rawConfig=this.templates[projectile.name].render.sprites[0],config='nativeVisual'in projectile&&projectile.nativeVisual?{...rawConfig,...projectile.nativeVisual}:rawConfig
       if(!art) {art=config.exo?new ExoSprite(this.towerAtlas,this.towerArt.exos[config.prefix!]):this.towerAtlas.create();this.projectileSprites.set(projectile.id,art);this.scene.add(art.root)}
-      const elapsed=this.session.time-projectile.born
+      const elapsed=projectile.name.startsWith('bullet_culverine_skill_a_')?this.session.time:this.session.time-projectile.born
       if(art instanceof ExoSprite)art.animate(config.name,elapsed)
       else if(config.prefix){const a=this.towerArt.animations[`${config.prefix}_${config.name}`];if(projectile.name.startsWith('bullet_culverine_')){const frame=nativeAnimationFrame(a.to-a.from+1,elapsed,config.loop??true,config.fps??30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,config.anchor)}else if(projectile.name.startsWith('bullet_skill_c_wizard_')){const frame=nativeAnimationFrame(a.to-a.from+1,this.session.time-(config.ts??0),config.loop??true,config.fps??30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,config.anchor)}else art.animate(a,elapsed,30,config.anchor)}
       else if(config.animated&&this.towerArt.animations[config.name]){const a=this.towerArt.animations[config.name],frame=nativeAnimationFrame(a.to-a.from+1,elapsed,config.loop??true,config.fps??30).frame;art.setFrame(`${a.prefix}_${String(a.from+frame).padStart(4,'0')}`,config.anchor)}
@@ -597,7 +612,9 @@ export class WorldRenderer {
   private clear() {
     this.catapultTrapsRenderer?.dispose();this.catapultTrapsRenderer=undefined
     this.catapultTarRenderer?.dispose();this.catapultTarRenderer=undefined
+    this.bolinMinesRenderer?.dispose();this.bolinMinesRenderer=undefined;this.bolinMortarRenderer?.dispose();this.bolinMortarRenderer=undefined;this.bolinRenderer?.dispose();this.bolinRenderer=undefined
     this.catapultBombRenderer?.dispose();this.catapultBombRenderer=undefined
+    this.culverineThrottleRenderer?.dispose();this.culverineThrottleRenderer=undefined
     this.culverineNativeRenderer?.dispose();this.culverineNativeRenderer=undefined
     this.reinforcementSpecialRenderer?.dispose();this.reinforcementSpecialRenderer=undefined
     this.knightArmorRenderer?.dispose();this.knightArmorRenderer=undefined

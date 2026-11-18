@@ -20,13 +20,13 @@ try{
     this.explosiveFixture=true;this.towers.sites.forEach(s=>s.attackDisabled=true);this.heroes.team.forEach(h=>h.scriptLocked=true)
     const site=this.towers.sites.find(s=>s.id==='8'),pos={x:site.pos.x+110,y:site.pos.y+100};site.attackDisabled=false
     this.spawnCinematicEnemy('enemy_bandit',1,pos);const enemy=this.enemies.at(-1);enemy.path=new PathFollower([pos,{x:pos.x+500,y:pos.y}]);enemy.hp=5000;enemy.template.health.hp_max=5000;enemy.template.motion.max_speed=0
-    const damages=[],shots=[],onDamage=this.combat.catapultBombs.onDamage,shoot=this.combat.catapultTowers.onShoot
-    this.combat.catapultBombs.onDamage=(e,value,time)=>{damages.push({id:e.id,value,time,hp:e.hp});onDamage(e,value,time)}
+    const damages=[],shots=[],onDamage=this.combat.nativeBombs.onDamage,shoot=this.combat.catapultTowers.onShoot
+    this.combat.nativeBombs.onDamage=(e,value,type)=>{damages.push({id:e.id,value,time:this.time,hp:e.hp});onDamage(e,value,type)}
     this.combat.catapultTowers.onShoot=(...args)=>{shots.push({name:args[1],level:args[6],at:args[5]});shoot(...args)}
     window.explosiveFixture={game:this,site,enemy,damages,shots}
    }
    advance.call(this,dt)
-   if(this.explosiveFixture){const {site,enemy,shots,damages}=window.explosiveFixture,state=this.combat.catapultTowers.states.get('8');window.explosiveObservation={time:this.time,power:site.powerLevels?.skill_b??0,parts:state?.parts,bombs:this.combat.catapultBombs.bombs.map(b=>({...b})),shots:[...shots],damages:[...damages],hp:enemy.hp,gold:this.gold}}
+   if(this.explosiveFixture){const {site,enemy,shots,damages}=window.explosiveFixture,state=this.combat.catapultTowers.states.get('8');window.explosiveObservation={time:this.time,power:site.powerLevels?.skill_b??0,parts:state?.parts,bombs:[...this.combat.nativeBombs.bombs].map(b=>({...b})),shots:[...shots],damages:[...damages],hp:enemy.hp,gold:this.gold}}
   }
  })
  await page.getByRole('button',{name:'2. 奥术魔法学院',exact:true}).click();await waitForGame(page)

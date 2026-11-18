@@ -8,7 +8,7 @@ for name,t in pairs(E.entities)do
  if t.timed and t.render and t.render.sprites[t.timed.sprite_id]then
   local sprite=t.render.sprites[t.timed.sprite_id]
   local a=art.animations[(sprite.prefix and(sprite.prefix..'_')or'')..sprite.name]
-  timed={duration=t.timed.duration,runs=t.timed.runs,fps=sprite.fps or 30,frames=a and(a.to-a.from+1)}
+  timed={disabled=t.timed.disabled,duration=t.timed.duration,runs=t.timed.runs,fps=sprite.fps or 30,frames=a and(a.to-a.from+1)}
   if sprite.exo and art.exos[sprite.prefix]then
    local exo=art.exos[sprite.prefix]
    for _,animation in ipairs(exo.animations)do if animation.name==sprite.name then timed.frames=#animation.frames;timed.fps=exo.fps;break end end

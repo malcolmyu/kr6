@@ -30,8 +30,8 @@ visit(slot)
 visit(purchaseFx)
 if mapButton then visit(mapButton)end
 local data=dofile('reference/apk/assets/gc64/kr6-phone/data/map_data.lua');local labels={}
-for _,hero in ipairs({'hero_gerald','hero_zefira'})do labels[hero]={};for id,node in pairs(data.data_upgrades[hero])do if type(node)=='table'then add(node.img);if node.img and atlas[node.img..'_disabled']then add(node.img..'_disabled')end;labels[hero][id]={title=strings[node.title_key],description=strings[node.description_key]}end end end
-for _,hero in ipairs({'hero_gerald','hero_zefira'})do add('hero_portraits_big_'..hero);add('hero_portraits_small_'..hero)end
+for _,hero in ipairs({'hero_gerald','hero_zefira','hero_bolin'})do labels[hero]={};for id,node in pairs(data.data_upgrades[hero])do if type(node)=='table'then add(node.img);if node.img and atlas[node.img..'_disabled']then add(node.img..'_disabled')end;labels[hero][id]={title=strings[node.title_key],description=strings[node.description_key]}end end end
+for _,hero in ipairs({'hero_gerald','hero_zefira','hero_bolin'})do add('hero_portraits_big_'..hero);add('hero_portraits_small_'..hero)end
 for _,hero in ipairs(data.hero_order_free)do add('icon_room_'..hero)end
 for name in pairs(missing)do print('Missing image '..name)end
 local out={purchaseFx=purchaseFx,slot=slot,heroOrder=data.hero_order_free,scale=require('screen_utils').get_default_base_scale(ctx.sw,ctx.sh).x,tooltip=tooltip,mapButton=mapButton,mapButtonPath=mapButtonPath,template=template,images=images,labels=labels,width=ctx.sw,height=ctx.sh}

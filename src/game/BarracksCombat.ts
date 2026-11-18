@@ -171,7 +171,7 @@ export class BarracksCombat {
     s.facingLeft=result.flip;s.idleVisual=result.visual
     if(s.name.startsWith('soldier_knights_lvl')||s.nativeReinforcement)s.visualOverride=result.visual
   }
-  finishHeroIdle(s:SoldierInstance,time:number,dt:number){if(s.idleRequestedAt===time&&!s.rangedUntil&&!s.attack&&!s.moving&&!s.scriptLocked){this.advanceIdle(s,time,dt);if(this.deferHeroes)this.advanceHeroRegen(s,time,dt)}}
+  finishHeroIdle(s:SoldierInstance,time:number,dt:number,allowRegen=true){if(s.idleRequestedAt===time&&!s.rangedUntil&&!s.attack&&!s.moving&&!s.scriptLocked){this.advanceIdle(s,time,dt);if(this.deferHeroes&&allowRegen)this.advanceHeroRegen(s,time,dt)}}
   private advanceHeroRegen(s:SoldierInstance,time:number,dt:number){if(time-s.lastHitAt>s.template.regen.last_hit_standoff_time){s.regenCounter+=dt;if(s.regenCounter>s.template.regen.cooldown){s.hp=Math.min(s.template.health.hp_max,s.hp+s.template.regen.health);s.regenCounter=0}}}
   initializeKnightInsert(s:SoldierInstance,time:number){
     if(!s.name.startsWith('soldier_knights_lvl'))return

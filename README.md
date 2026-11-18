@@ -1,5 +1,29 @@
 # 王国保卫战 6 还原工程
 
+博林第二天赋「爆炸弹」已接入正式射击计数、命中载荷与范围伤害；八条天赋+C专项链及基础攻击回归共15700帧、Chrome1300个检查点通过。验证临时数据用完即删。详见 [BOLIN_TALENT2_SOURCE.md](analysis/BOLIN_TALENT2_SOURCE.md)。其余博林能力及完整视频验收仍待完成。
+
+2026-11-19：已按用户要求清理约33.4 GiB过程证据；游戏运行资源保留。以下历史报告中的大型轨迹、截图和日志已删除，对应差分测试须重新生成数据。详见 [EVIDENCE_CLEANUP.md](analysis/EVIDENCE_CLEANUP.md)。
+
+博林 B「地雷阵」已接入正式布雷、抛射、触发/强制引爆、范围伤害及弹坑；26条原版整链/38000帧通过。Chrome四组共5900个检查点、355658个场景排序记录通过，包含远处容量与合法三技能组合；完整默认回归仍在执行。见 [BOLIN_B_NATIVE_RUNTIME.md](analysis/BOLIN_B_NATIVE_RUNTIME.md)。天赋2、ultimate、移动近战、正常换队及六流程视频/听感仍待完成。
+
+博林 A「烟雾迫击炮」三档已接入正式施法、三发抛射/粒子、烟雾/减速和弹坑生命周期；21条原版链/24200帧及Chrome三组/3300个检查点、200599个场景排序元数据通过，包括合法A+C组合与死亡复活。路径边界第三发落点已按原版夹取规则修正。见 [BOLIN_A_NATIVE_RUNTIME.md](analysis/BOLIN_A_NATIVE_RUNTIME.md)。B、天赋2、ultimate、移动近战、正常换队及六流程视频/听感仍待完成。
+
+博林 C「巨人杀手」已接入正式特殊弹体、生命比例伤害、射线及两项命中效果；25条合法存档专项链/22700帧和Chrome四组/3800个检查点、210626个场景排序元数据通过。修正复活当帧结算经验，并保留原版弹体入场前目标已移除时射线不清理的行为。见 [BOLIN_C_NATIVE_RUNTIME.md](analysis/BOLIN_C_NATIVE_RUNTIME.md)。A/B、天赋2、ultimate、移动近战、正常换队及六流程视频/听感仍待完成。
+
+博林基础远攻、弹壳/粒子与普通死亡爆炸/复活已接入正式实体：14条原版整链12800帧，Chrome基础/死亡复活合计2000个检查点及111153个场景排序元数据通过。初始2级/1000经验、原版升级补丁与队伍存档规则已验证；正常换队UI、高级技能、移动近战及特殊死亡尚未完成。见 [BOLIN_BASE_NATIVE_RUNTIME.md](analysis/BOLIN_BASE_NATIVE_RUNTIME.md)。整体目标仍约80%，六流程新档与完整视频/听感仍待验收。
+
+投石塔 C「防卫区域」已接入正式陷阱/眩晕、统一伤害与真实来源容量；17条原始整链/16000帧和正常三级购买/实际停步/卖塔后触发通过。三项投石塔效果的绘制层级也已按原版修正，Chrome2500个原始检查点、163814个场景提交帧排序元数据及1171个技能效果图集/透明度检查通过。见 [CATAPULT_C_NATIVE_RUNTIME.md](analysis/CATAPULT_C_NATIVE_RUNTIME.md)。整体默认回归和A/B/C正常菜单复验已通过；普通混战全场、11星波林、六流程新档与视频/听感仍需继续。
+
+投石塔 A「焦油覆地」与 B「爆裂投石」已补齐正式区域实体及统一调度：A的48组区域/20160帧与六条GameSession整链/5000帧、B的四条整链/3600帧及21次原版音效请求通过；Chrome两项正常三级购买、实际减速/二次伤害、卖塔后存续与清理均通过。见 [CATAPULT_TAR_NATIVE_RUNTIME.md](analysis/CATAPULT_TAR_NATIVE_RUNTIME.md)、[CATAPULT_B_NATIVE_RUNTIME.md](analysis/CATAPULT_B_NATIVE_RUNTIME.md)。普通战役全场绘制、11星波林、六流程新档和视频/听感仍需继续。
+
+Culverine「火力全开」已接入正常三级150/200/250金币购买、3/6/9发连射、独立前后层光效及原始0.7秒延迟音效。13组原始控制器轨迹/16200帧、普通第三关战役20100帧自然胜利、1817次具名音效请求，以及Chrome全部10805个绘制检查点/1200147个实际提交帧通过；胜利后180帧原始续播也已独立校验。详见 [CULVERINE_THROTTLE_NATIVE_RUNTIME.md](analysis/CULVERINE_THROTTLE_NATIVE_RUNTIME.md)。整体仍约80%：11星可达波林尚未接入；投石塔C正式实体专项现已通过；六流程新档和完整视频/听感仍待验收。
+
+Culverine「硫磺爆裂」已接入正常三级125金币购买、抛射/粒子、落地爆炸、持续烟雾及临时降魔抗。13组塔整链/11700帧、30组区域链/15000帧、36组原始回调，以及普通战役19253帧/24216事件/31725随机数调用/1685次有效音效请求通过；正常菜单购买、卖塔后区域存续及到期恢复魔抗验证通过。Chrome整场10101个绘制检查点/1118466个提交帧通过，包含烟雾循环、透明度、粒子实际图集帧、场景顺序及真实结算。见 [CULVERINE_SULFUR_NATIVE_RUNTIME.md](analysis/CULVERINE_SULFUR_NATIVE_RUNTIME.md)；六流程新档和完整视频/听感仍待完成。
+
+Culverine「锋利弹片」已开放正常三级100金币购买，原版永久减甲、射线和命中贴花已接入正式实体。九条完整链/6300帧、216次插入回调、普通战役整场19603帧/24986事件/32728随机调用/1769次有效音效请求，以及Chrome全部9929个绘制检查点通过；正常菜单购买、卖塔后永久减甲及光效清理验证通过。该策略与原版一致自然败北，不能替代全新存档六流程通关或视频/实际听感验收。见 [CULVERINE_SKILL_B_NATIVE_RUNTIME.md](analysis/CULVERINE_SKILL_B_NATIVE_RUNTIME.md)。A/C现已完成专项对照，见上方报告。
+
+Culverine 四个基础等级已接入真实射线、范围伤害与命中贴花生命周期；普通战役整场18658帧、1599次具名音效请求、Chrome全部9309个绘制检查点/1043571个提交帧匹配原版并自然败北。修正烟雾动作中尸体HP恢复后的死亡标记及EXO取帧，见 [CULVERINE_NATIVE_RUNTIME.md](analysis/CULVERINE_NATIVE_RUNTIME.md)。高级分支、六流程新档与完整视频/听感仍在推进。
+
 高级援军的真实入场/光环/护甲及伤害修饰器已接入原版实体阶段，补齐入场阵亡、连续召唤刷新、三段攻击、退场与护甲光效；同时将血条淡入淡出移到固定模拟帧，并还原烟雾清零透明度和漏怪删除边界。63882条整场原版血条记录通过，原有3-2胜利浏览器回归也通过。详见 [REINFORCEMENT_SPECIAL_NATIVE_GAP.md](analysis/REINFORCEMENT_SPECIAL_NATIVE_GAP.md)。整体六流程、视频和听感验收仍未完成。
 
 骑士塔「继承遗志」的阵亡检测、八秒强化攻击与概率眩晕已接入正常三级购买。12组核心原版控制器及576组眩晕用例通过；一条普通战役整场12623帧、1989次有效音效请求和Chrome全部641个绘制检查点匹配原版并自然败北。高级援军旧实体缺口已修正，扩展后的16组控制器用例及真实图集光效浏览器检查通过；普通高级援军战役已匹配原版整场13037帧、2246次有效音效请求、1886个Chrome绘制检查点与257410个提交帧，策略自然败北；见 [KNIGHT_LEGACY_NATIVE_RUNTIME.md](analysis/KNIGHT_LEGACY_NATIVE_RUNTIME.md) 和 [REINFORCEMENT_SPECIAL_NATIVE_GAP.md](analysis/REINFORCEMENT_SPECIAL_NATIVE_GAP.md)。

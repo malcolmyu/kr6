@@ -236,3 +236,12 @@ dofile('scripts/export_hero_life_templates.lua')
 dofile('scripts/export_victory_timing.lua')
 
 dofile('scripts/export_gerald_survivor_templates.lua')
+
+-- Bolin patches and metadata use isolated native VMs to preserve template state.
+assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_hero_team_rules.lua')==0)
+assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_upgrade_rules.lua')==0)
+assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_casing_particles.lua')==0)
+assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_runtime.lua')==0)
+assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_mortar.lua')==0)
+
+assert(os.execute('reference/luajit-beta3/src/luajit scripts/export_bolin_mines.lua')==0)

@@ -14,7 +14,7 @@ export class HealthBarRenderer {
     const live=new Set<string>()
     const units=[...session.enemies.map(e=>({key:`enemy-${e.id}`,source:e,id:e.id,hp:e.hp,max:Array.isArray(e.template.health.hp_max)?e.template.health.hp_max[1]:e.template.health.hp_max,pos:e.path.position,config:(e.template as unknown as {health_bar?:HealthBarConfig}).health_bar,removed:e.diedAt!==undefined||e.escapedAt!==undefined&&!session.entities||e.teleportHidden})),...session.barracks.soldiers.map(s=>({key:`soldier-${s.id}`,source:s,id:s.id,hp:s.hp,max:s.template.health.hp_max,pos:s.pos,config:(s.template as unknown as {health_bar?:HealthBarConfig}).health_bar,removed:s.healthBarHidden}))]
     for(const unit of units) {
-      if(!unit.config || unit.hp<=0 || unit.removed)continue
+      if(!unit.config || unit.hp<=0&&!session.entities || unit.removed)continue
       live.add(unit.key)
       let bar=this.bars.get(unit.key)
       if(!bar) {
