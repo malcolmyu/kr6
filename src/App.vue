@@ -59,7 +59,7 @@ function saveGlobalUpgrades(selected:GlobalUpgradeSelection){progress={...progre
 function openPowerRoom(){saveSessionProgress();heroRoomProgress.value=progress;powerRoomVisible.value=true}
 function savePowerUpgrades(kind:PowerKind,nodes:string[]){progress={...progress,powerUpgrades:{...progress.powerUpgrades,[kind]:validatePowerUpgrades(kind,progress.powerXp?.[kind]??0,nodes)}};heroRoomProgress.value=progress;persistProgress()}
 function savePowerEquipment(kind:PowerKind,slot:number){progress=equipPower(progress,kind,slot);heroRoomProgress.value=progress;persistProgress()}
-function openHeroRoom(){if(world?.session)progress=recordPowerXp(recordHeroXp(progress,world.session.heroes.team),world.session.powers.progression.snapshot());heroRoomProgress.value=progress;heroRoomVisible.value=true}
+function openHeroRoom(){saveSessionProgress();heroRoomProgress.value=progress;heroRoomVisible.value=true}
 function saveHeroUpgrades(hero:string,nodes:string[]){progress={...progress,heroUpgrades:{...progress.heroUpgrades,[hero]:nodes}};heroRoomProgress.value=progress;persistProgress()}
 const outcomePresentation=new OutcomePresentation(),outcomeVisible=ref(false),outcomeHudHidden=ref(false)
 function clearOutcomePresentation(){outcomePresentation.clear();outcomeVisible.value=false;outcomeHudHidden.value=false}

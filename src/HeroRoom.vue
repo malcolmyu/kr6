@@ -4,12 +4,14 @@ import NativeUiNode from './NativeUiNode.vue'
 import {heroRoomPoses,heroRoomView} from './game/HeroRoom'
 import type {HeroRoomArt} from './game/HeroRoom'
 import type {Progress} from './game/ProgressStore'
+import {heroLevel} from './game/HeroProgression'
+import {effectiveHeroXp} from './game/HeroTeam'
 import {heroUpgradeData,purchaseHeroUpgrade,remainingHeroPoints} from './game/HeroUpgrades'
 const props=defineProps<{progress:Progress}>(),emit=defineEmits<{close:[];purchase:[hero:string,nodes:string[]];sound:[name:string]}>()
 const purchases=ref<{id:string;at:number}[]>([]),purchaseTimers:ReturnType<typeof setTimeout>[]=[]
 const data=shallowRef<HeroRoomArt>(),hero=ref('hero_gerald'),focus=ref<string>(),age=ref(0),error=ref(''),viewport=ref({w:innerWidth,h:innerHeight})
 let handle=0,previous=0,disposed=false
-const xp=computed(()=>props.progress.heroes?.[hero.value]??0),nodes=computed(()=>props.progress.heroUpgrades?.[hero.value]??[])
+const xp=computed(()=>effectiveHeroXp(props.progress,hero.value)),nodes=computed(()=>props.progress.heroUpgrades?.[hero.value]??[])
 const view=computed(()=>data.value?heroRoomView(data.value,hero.value,xp.value,nodes.value,focus.value,purchases.value):undefined)
 const poses=computed(()=>data.value?heroRoomPoses(data.value,age.value):{}),scale=computed(()=>Math.min(viewport.value.w/1365.333333,viewport.value.h/768)*(data.value?.scale??.48))
 const points=computed(()=>remainingHeroPoints(heroUpgradeData,hero.value,xp.value,nodes.value))
@@ -30,7 +32,7 @@ onMounted(async()=>{addEventListener('resize',resize);addEventListener('keydown'
 onBeforeUnmount(()=>{disposed=true;purchaseTimers.forEach(clearTimeout);cancelAnimationFrame(handle);removeEventListener('resize',resize);removeEventListener('keydown',key)})
 </script>
 <template>
- <section class="native-hero-room" role="dialog" aria-label="英雄技能" :data-hero="hero" :data-points="points">
+ <section class="native-hero-room" role="dialog" aria-label="英雄技能" :data-hero="hero" :data-points="points" :data-xp="xp" :data-level="heroLevel(xp)">
   <div class="room-paper" :style="{transform:`translate(-50%,-50%) scale(${scale})`}"><NativeUiNode v-if="view&&data" :node="view" :images="data.images" :poses="poses" :age="age" @action="action"/></div>
   <p v-if="error" role="alert">{{error}}</p>
  </section>

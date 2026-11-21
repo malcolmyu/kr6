@@ -160,6 +160,7 @@
     "test:bolin-b-paint": "node scripts/browser_bolin_controlled_paint.mjs bolin-b && node scripts/browser_bolin_controlled_paint.mjs bolin-b-trigger trigger && node scripts/browser_bolin_controlled_paint.mjs bolin-b-far-cap far-cap && node scripts/browser_bolin_controlled_paint.mjs bolin-b-combo-rank3 combo",
     "test:native-bolin-a": "node scripts/verify_bolin_a_native_chain_all.mjs",
     "test:bolin-a-paint": "node scripts/browser_bolin_controlled_paint.mjs bolin-a && node scripts/browser_bolin_controlled_paint.mjs bolin-a-mortar-left mortar-left && node scripts/browser_bolin_controlled_paint.mjs bolin-a-combo",
+    "test:progression-room": "node scripts/verify_progression_room_binding.mjs",
     "test:enemy-book": "node scripts/verify_enemy_book.mjs",
     "test:map-resources": "node scripts/verify_map_resources.mjs",
     "build:pages": "vue-tsc --noEmit && vite build --base=/kr6/"

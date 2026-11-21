@@ -2,6 +2,7 @@ import data from '../../public/data/power-progression.json' with {type:'json'}
 import type {PowerKind} from './PowerSystem'
 const rules=data.rules
 export const powerKinds:PowerKind[]=['reinforcements','rain_of_fire','royal_edict']
+export function effectivePowerXp(kind:string,xp=0){const starting=(rules.powers_starting_level as Record<string,number>)[kind]??1;return Math.max(xp,starting>=2?rules.powers_xp_thresholds[starting-2]:0)}
 export function powerLevel(xp:number){return 1+rules.powers_xp_thresholds.filter(value=>xp>=value).length}
 export function powerXpFraction(xp:number){
  const level=powerLevel(xp);if(level===6)return 1
@@ -17,7 +18,7 @@ export class PowerProgression {
  constructor(){this.configure()}
  configure(saved:Partial<Record<PowerKind,number>>={},playerLevel=0,mode=1){
   this.playerLevel=playerLevel;this.mode=mode
-  for(const kind of powerKinds){const starting=rules.powers_starting_level[kind],base=Math.max(saved[kind]??0,starting>=2?rules.powers_xp_thresholds[starting-2]:0);this.status[kind]={base,gain:0,level:powerLevel(base)}}
+  for(const kind of powerKinds){const base=effectivePowerXp(kind,saved[kind]??0);this.status[kind]={base,gain:0,level:powerLevel(base)}}
  }
  use(kind:PowerKind){
   const state=this.status[kind],expected=rules.power_level_expected[this.playerLevel-1],difference=powerLevel(state.base)-expected

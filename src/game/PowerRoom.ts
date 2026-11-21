@@ -4,7 +4,7 @@ import type {HeroUpgradeData} from './HeroUpgrades'
 import {evaluateHeroGraph} from './HeroUpgrades.ts'
 import type {Progress} from './ProgressStore'
 import {playerLevel} from './ProgressStore.ts'
-import {powerLevel,powerXpFraction} from './PowerProgression.ts'
+import {powerLevel,powerXpFraction,effectivePowerXp} from './PowerProgression.ts'
 import {equippedPowers,powerUnlocked,powerRequiredStars} from './NativeProgression.ts'
 import {nativeLabelStyle} from './NativeLabelStyle.ts'
 import type {PowerKind} from './PowerSystem'
@@ -16,7 +16,7 @@ export interface PowerRoomArt extends HeroRoomArt {
 }
 const visit=(n:RoomNode,fn:(n:RoomNode)=>void)=>{fn(n);n.children?.forEach(c=>visit(c,fn))}
 export function powerRoomStats(data:PowerRoomArt,progress:Progress,kind:string){
- const xp=progress.powerXp?.[kind as PowerKind]??0,selected=progress.powerUpgrades?.[kind as PowerKind]??[],source=`power_${kind}`,level=powerLevel(xp)
+ const xp=effectivePowerXp(kind,progress.powerXp?.[kind as PowerKind]??0),selected=progress.powerUpgrades?.[kind as PowerKind]??[],source=`power_${kind}`,level=powerLevel(xp)
  return {...data.units[kind],xp,level,fraction:powerXpFraction(xp),selected,points:level-1-selected.reduce((sum,id)=>sum+(data.nodes[source]?.[id]?.cost??0),0),unlocked:powerUnlocked(progress,kind),extraXp:level<=(data.xpExpected[playerLevel(progress)-1]??0)-data.showXpOffset}
 }
 export interface PowerRoomPickMotion {at:number;active:boolean;angles:number[]}

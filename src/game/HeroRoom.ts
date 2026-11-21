@@ -1,3 +1,4 @@
+import {heroLevel,heroXpFraction} from './HeroProgression.ts'
 import {heroUpgradeData,evaluateHeroGraph,remainingHeroPoints} from './HeroUpgrades.ts'
 import type {UiNode,UiPose} from './OutcomeAnimation'
 import type {Point} from './types'
@@ -12,6 +13,7 @@ export function heroRoomPoses(data:HeroRoomArt,age:number){
  return result
 }
 export function heroRoomView(data:HeroRoomArt,hero:string,xp:number,selected:string[],focus?:string,purchases:{id:string;at:number}[]=[]):RoomNode{
+ const level=heroLevel(xp),fraction=heroXpFraction(level,xp)
  const view=structuredClone(data.template),tree=roomFind(view,'group_hero_lvl_tree')!,graph=heroUpgradeData.graphs[hero],nodes=heroUpgradeData.nodes[hero],points=remainingHeroPoints(heroUpgradeData,hero,xp,selected),result=evaluateHeroGraph(graph,selected,points)
  const panel=roomFind(view,'group_tower_upgrades')!,timeline=roomFind(view,'timeline_tower_room')!
  // The native upgrade-page timeline contains the full-screen desktop tree panel.
@@ -34,7 +36,7 @@ export function heroRoomView(data:HeroRoomArt,hero:string,xp:number,selected:str
  }
  for(const child of tree.children??[]){if(child.class==='GGHexGridNode'&&!used.has(child.id!))child.hidden=true;if(child.id?.startsWith('connection_'))child.hidden=!result.active_links[child.id.slice(11)];if(child.id?.startsWith('mask_')){const [x,y]=child.id.slice(5).split('_').map(Number);child.hidden=Object.values(result.active_links).filter(e=>e.coord_x===x&&Math.abs(e.coord_y-y)===1).length<2}}
  const origin=roomFind(tree,'button_tower_roster')!
- visit(origin,n=>{if(n.id==='image_portrait_small')n.image_name=`hero_portraits_small_${hero}`;if(n.id&&['group_label_new_sign','alert_sign','group_sale_label_small','label_coming_soon','image_towr_locked_padlock','group_check_bg','group_xp_small_portrait','group_xp_info'].includes(n.id))n.hidden=true})
+ visit(origin,n=>{if(n.id==='label_portrait_small_lvl_number')n.text=String(level);if(n.id==='image_portrait_small_xp_bar')n.scale={x:fraction,y:n.scale?.y??1};if(n.id==='group_xp_info')n.hidden=false;if(n.id==='image_portrait_small')n.image_name=`hero_portraits_small_${hero}`;if(n.id&&['group_label_new_sign','alert_sign','group_sale_label_small','label_coming_soon','image_towr_locked_padlock','group_check_bg','group_xp_small_portrait'].includes(n.id))n.hidden=true})
  const team=['hero_gerald','hero_zefira'],slotSize=data.images[data.slot.default_image_name!]
  const slot=(name:string,x:number,y:number,scale:number)=>{
   const n=structuredClone(data.slot);n.pos={x,y};n.scale={x:scale,y:scale};n.action=team.includes(name)?`hero:${name}`:undefined;n.label=name==='hero_gerald'?'杰拉尔德':'泽菲拉'
@@ -52,5 +54,6 @@ export function heroRoomView(data:HeroRoomArt,hero:string,xp:number,selected:str
   visit(tip,n=>{if(n.id?.startsWith('upgrade_tooltip_arrow_'))n.hidden=n.id!==`upgrade_tooltip_arrow_${index}`;if(n.id==='label_upgrades_room_tooltip_title'){n.text=info.title??'';n.hidden=!info.title}if(n.id==='label_upgrades_room_tooltip_desc'){n.text=info.description??'';n.hidden=!info.title}if(n.id==='label_upgrades_room_tooltip_desc_no_title'){n.text=info.description??'';n.hidden=!!info.title}})
   const arrow=roomFind(tip,`upgrade_tooltip_arrow_${index}`)!;tip.anchor={...arrow.pos!};panel.children!.push(tip)
  }
+ visit(view,n=>{if(n.id==='label_lvl_number')n.text=String(level);if(n.id==='image_xp_bar')n.scale={x:fraction,y:n.scale?.y??1}})
  return view
 }
