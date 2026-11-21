@@ -1,1 +1,1 @@
-{"sourceCommit": "8a1100cff49e31246e4a95fdeae791ef03d74f6b", "builtAt": "2026-11-18T18:14:33.862122+00:00", "fixes": ["map-load-recovery", "enemy-encyclopedia", "discovery-progress"]}
+{"sourceCommit": "7927c700cd597fe175500589f8c1fd7a8cbb4b0e", "builtAt": "2026-11-21T02:04:57.089689+00:00", "fixes": ["hero-level-display", "hero-xp-display", "native-starting-levels", "room-xp-save"]}
